@@ -21,7 +21,7 @@ in under 10 seconds.
 ## Architecture
 
 ```
-Flutter App → FastAPI → 5-Agent Pipeline (Google Antigravity) → Google Sheets + Supabase
+Flutter App → FastAPI → 5-Agent Pipeline (Google Antigravity) → Google Sheets + Firebase
 ```
 
 ### Agent Pipeline
@@ -37,7 +37,7 @@ Flutter App → FastAPI → 5-Agent Pipeline (Google Antigravity) → Google She
 
 Antigravity orchestrates the entire agent pipeline:
 - Agent sequencing and context passing
-- MCP tool integration (Sheets, Supabase, Maps, GitHub)
+- MCP tool integration (Sheets, Firebase, Maps, GitHub)
 - Decision tracing and artifact generation
 - All agent code written by Antigravity agents via mission prompts
 
@@ -49,7 +49,7 @@ See `.antigravity/artifacts/` for generated trace logs.
 | MCP Server | Purpose |
 |------------|---------|
 | Google Sheets MCP | Primary simulation DB — before/after proof |
-| Supabase MCP | Volunteers table + dispatch logs |
+| Firebase Firestore | Volunteers table + dispatch logs |
 | Google Maps MCP | Volunteer-to-applicant distance |
 | GitHub MCP | Auto-commit agent-written code |
 | Playwright MCP | Browser testing + screenshots |
@@ -60,7 +60,7 @@ See `.antigravity/artifacts/` for generated trace logs.
 |-------|-----------|
 | Orchestration | Google Antigravity + Gemini 3.1 Pro |
 | Backend | FastAPI (Python) |
-| Database | Supabase (PostgreSQL) + Google Sheets |
+| Database | Firebase (Firestore) + Google Sheets |
 | Mobile App | Flutter (Dart) |
 | Dashboard | Streamlit |
 | Hosting | Render.com (free tier) |

@@ -158,7 +158,7 @@ trace_entry = {
 ## WHAT YOU MUST NOT DO
 
 - Do NOT assign volunteers
-- Do NOT write to Google Sheets or Supabase
+- Do NOT write to Google Sheets or Firebase directly \u2014 all DB writes route through FastAPI
 - Do NOT call Maps MCP
 - Do NOT change `validation_status`
 - Do NOT skip scoring even for NEED_MORE_INFO cases (they still get scored)

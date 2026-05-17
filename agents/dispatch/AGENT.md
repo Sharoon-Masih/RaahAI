@@ -24,7 +24,7 @@ and you:
 1. Find the nearest available volunteer using Maps MCP
 2. Assign them to this case
 3. Update Google Sheets to show DISPATCHED (this is the Before/After proof for judges)
-4. Log the dispatch permanently in Supabase
+4. Log the dispatch permanently in Firebase Firestore
 5. Generate an SMS draft for the applicant in Roman Urdu
 6. Generate a volunteer instruction message
 7. Create a unique ticket ID for tracking
@@ -58,14 +58,19 @@ agent_trace         → your TraceObject appended (most detailed of all agents)
 
 ## EXECUTION STEPS (Run In This Order)
 
-### Step 1 — Volunteer Lookup (Maps MCP + Supabase MCP)
+### Step 1 — Volunteer Lookup (Maps MCP + Firebase Firestore via FastAPI)
 
 ```
-Query Supabase volunteers table:
-  SELECT id, name, phone, area, is_available
-  FROM volunteers
-  WHERE is_available = true
-  ORDER BY area
+Call FastAPI endpoint GET /volunteers?available=true
+to retrieve all available volunteers from Firebase Firestore (volunteers collection).
+
+Each volunteer document:
+  id:           "V-001"
+  name:         string
+  area:         "Korangi, Karachi"
+  is_available: boolean
+  lat:          float
+  lng:          float
 
 Then use Maps MCP to find distance from each volunteer to applicant location.
 Select volunteer with shortest distance.
@@ -73,17 +78,16 @@ If no volunteer available → set volunteer_assigned = "NO_VOLUNTEER_FOUND",
 dispatch_status = "PENDING_MANUAL"
 ```
 
-**Volunteer table schema (Supabase):**
-```sql
-volunteers (
-  id          TEXT PRIMARY KEY,   -- "V-001"
-  name        TEXT,
-  phone       TEXT,
-  area        TEXT,               -- "Korangi, Karachi"
-  is_available BOOLEAN,
-  lat         FLOAT,
-  lng         FLOAT
-)
+**Volunteer Firestore document schema (`volunteers/{id}`):**
+```json
+{
+  "id": "V-001",
+  "name": "string",
+  "area": "Korangi, Karachi",
+  "is_available": true,
+  "lat": 24.8607,
+  "lng": 67.0011
+}
 ```
 
 ### Step 2 — Generate Ticket ID
@@ -138,42 +142,39 @@ sheets_mcp.update_range(
 )
 ```
 
-### Step 5 — Log to Supabase (Supabase MCP)
+### Step 5 — Log to Firebase Firestore (via FastAPI /log-dispatch endpoint)
 
 ```python
-# Supabase MCP call
-supabase_mcp.insert(
-    table="dispatch_logs",
-    record={
-        "case_id": case_id,
-        "ticket_id": ticket_id,
-        "volunteer_id": volunteer_id,
-        "severity_score": severity_score,
-        "severity_level": severity_level,
-        "time_sensitivity": time_sensitivity,
-        "crisis_type": crisis_type,
-        "dispatched_at": datetime.utcnow().isoformat(),
-        "sms_draft": sms_draft,
-        "action_summary": f"Volunteer {volunteer_name} assigned for {crisis_type} case"
-    }
-)
+# POST to FastAPI MCP gateway — never write to Firebase directly
+dispatch_log = {
+    "case_id": case_id,
+    "ticket_id": ticket_id,
+    "volunteer_id": volunteer_id,
+    "severity_score": severity_score,
+    "severity_level": severity_level,
+    "time_sensitivity": time_sensitivity,
+    "crisis_type": crisis_type,
+    "dispatched_at": datetime.utcnow().isoformat(),
+    "sms_draft": sms_draft,
+    "action_summary": f"Volunteer {volunteer_name} assigned for {crisis_type} case"
+}
+# → stored in Firestore: dispatch_logs/{ticket_id}
 ```
 
-**Dispatch logs table schema (Supabase):**
-```sql
-dispatch_logs (
-  id              SERIAL PRIMARY KEY,
-  case_id         TEXT,
-  ticket_id       TEXT UNIQUE,
-  volunteer_id    TEXT,
-  severity_score  FLOAT,
-  severity_level  TEXT,
-  time_sensitivity TEXT,
-  crisis_type     TEXT,
-  dispatched_at   TIMESTAMPTZ,
-  sms_draft       TEXT,
-  action_summary  TEXT
-)
+**Dispatch Firestore document schema (`dispatch_logs/{ticket_id}`):**
+```json
+{
+  "case_id": "string",
+  "ticket_id": "string",
+  "volunteer_id": "string",
+  "severity_score": 0.0,
+  "severity_level": "string",
+  "time_sensitivity": "string",
+  "crisis_type": "string",
+  "dispatched_at": "ISO-8601",
+  "sms_draft": "string",
+  "action_summary": "string"
+}
 ```
 
 ## MCP TOOLS USED
@@ -181,7 +182,7 @@ dispatch_logs (
 | Tool | When | What For |
 |------|------|---------|
 | Google Sheets MCP | Step 4 | Update case status — BEFORE/AFTER proof |
-| Supabase MCP | Steps 1 & 5 | Volunteer query + dispatch log |
+| Firebase Firestore (via FastAPI) | Steps 1 & 5 | Volunteer query + dispatch log |
 | Google Maps MCP | Step 1 | Distance calculation |
 | Gemini API | Step 3 | SMS draft generation |
 
@@ -191,7 +192,7 @@ dispatch_logs (
 ```python
 volunteer_assigned = "NO_VOLUNTEER_FOUND"
 dispatch_status = "PENDING_MANUAL"
-# Still update Sheet, still create ticket, still log to Supabase
+# Still update Sheet, still create ticket, still log to Firebase
 # Add note in trace: "Manual assignment required"
 ```
 
@@ -200,14 +201,14 @@ dispatch_status = "PENDING_MANUAL"
 # Retry once
 # If retry fails: log error in trace
 # Set dispatch_status = "FAILED"
-# Continue to Supabase log (independent)
+# Continue to Firebase log (independent)
 ```
 
-### If Supabase MCP Fails
+### If Firebase Log Fails
 ```python
 # Log error in trace only
 # Sheet update takes priority — do NOT fail entire dispatch
-# Note: "Supabase log failed, Sheet updated successfully"
+# Note: "Firebase log failed, Sheet updated successfully"
 ```
 
 ### If Maps MCP Fails
@@ -231,16 +232,16 @@ trace_entry = {
         f"Ticket {ticket_id} created."
     ),
     "tool_calls": [
-        "supabase_mcp:volunteers_query",
+        "firebase_firestore:volunteers_query (via FastAPI)",
         "maps_mcp:distance_matrix",
         "gemini_api:sms_generation",
         "sheets_mcp:update_row",
-        "supabase_mcp:dispatch_log_insert"
+        "firebase_firestore:dispatch_log_insert (via FastAPI)"
     ],
     "output_summary": (
         f"DISPATCHED. Volunteer: {volunteer_name}. "
         f"Ticket: {ticket_id}. Sheet updated. "
-        f"SMS drafted. Supabase logged."
+        f"SMS drafted. Firebase logged."
     )
 }
 ```
@@ -248,7 +249,8 @@ trace_entry = {
 ## WHAT YOU MUST NOT DO
 
 - Do NOT skip the Sheets update — it is the core simulation proof
-- Do NOT skip the Supabase log — it is permanent audit trail
-- Do NOT store applicant phone number in Supabase logs
+- Do NOT skip the Firebase log — it is permanent audit trail
+- Do NOT store applicant phone number in Firebase logs
 - Do NOT reassign a case that already has `dispatch_status = "DISPATCHED"`
 - Do NOT call Gemini for scoring — that is Severity Agent's job
+- Do NOT write to Firebase directly — always route through FastAPI

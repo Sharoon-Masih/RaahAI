@@ -7,7 +7,7 @@
 ### SKILL 1: Volunteer Matching
 **What:** Find the best available volunteer for this case.
 **Method:**
-  1. Query Supabase for all available volunteers (is_available = true)
+  1. Call FastAPI GET /volunteers?available=true to query Firebase Firestore volunteers collection
   2. Use Maps MCP to calculate distance from each to applicant location
   3. Select shortest distance
   4. If tie → prefer volunteer whose area matches applicant's area keyword
@@ -32,12 +32,12 @@
 ### SKILL 3: Action Execution
 **What:** Coordinate all MCP tool calls in correct sequence.
 **Sequence (must be in this order):**
-  1. Supabase query (get volunteers)
+  1. Firebase Firestore query via FastAPI (get volunteers)
   2. Maps distance (find nearest)
   3. Generate ticket_id
   4. Gemini SMS draft
   5. Sheets update (before/after proof)
-  6. Supabase log (audit trail)
+  6. Firebase Firestore log via FastAPI (audit trail)
 **Never skip steps 5 and 6.** They are non-optional.
 
 ---
@@ -49,7 +49,7 @@
 - Ticket IDs are globally unique (timestamp-based)
 - Dispatch log is permanent — never delete, only append
 - Trace must include all 5+ tool calls explicitly listed
-**Output:** dispatch_logs record in Supabase
+**Output:** dispatch_logs document in Firebase Firestore (via FastAPI /log-dispatch)
 
 ---
 

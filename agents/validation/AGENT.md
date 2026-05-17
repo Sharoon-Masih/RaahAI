@@ -142,6 +142,6 @@ trace_entry = {
 - Do NOT score severity
 - Do NOT reject medical or child-welfare cases as INVALID
 - Do NOT store any PII in trace
-- Do NOT call Sheets, Supabase, or Maps MCP
+- Do NOT call Sheets, Firebase, or Maps MCP directly — all DB writes route through FastAPI
 - Do NOT modify any fields except `validation_status`, `pipeline_stage`, `agent_trace`
 - Do NOT block the pipeline on your own errors — default to NEED_MORE_INFO

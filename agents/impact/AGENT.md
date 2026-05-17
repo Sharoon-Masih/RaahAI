@@ -146,7 +146,7 @@ trace_entry = {
 ## WHAT YOU MUST NOT DO
 
 - Do NOT assign volunteers
-- Do NOT write to Google Sheets or Supabase
+- Do NOT write to Google Sheets or Firebase directly \u2014 all DB writes route through FastAPI
 - Do NOT change severity_score or severity_level
 - Do NOT block pipeline if Maps MCP is unavailable
 - Do NOT use Maps MCP for anything other than remoteness check

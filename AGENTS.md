@@ -1,98 +1,81 @@
-# 🚀 `AGENTS.md — RAAHDO SYSTEM CONSTITUTION (FINAL PRODUCTION VERSION)`
+AGENTS.md — RaahAI System Constitution
+============================================================
+SINGLE SOURCE OF TRUTH — DO NOT IGNORE THIS FILE
+============================================================
+1. PROJECT IDENTITY
 
-```md
-# AGENTS.md — RaahDo System Constitution
-# ============================================================
-# SINGLE SOURCE OF TRUTH — DO NOT IGNORE THIS FILE
-# ============================================================
+Name: RaahAI — Autonomous NGO Case Intelligence & Dispatch System
+Domain: Humanitarian / Welfare Tech (Pakistan-first, globally scalable)
+Challenge: Google Antigravity Hackathon — Challenge 1
+Tagline: Insight → Validate → Prioritize → Act → Deliver
 
-## 1. PROJECT IDENTITY
+CORE PROBLEM
 
-**Name:** RaahDo — Autonomous NGO Case Intelligence & Dispatch System  
-**Domain:** Humanitarian / Welfare Tech (Pakistan-first, globally scalable)  
-**Challenge:** Google Antigravity Hackathon — Challenge 1  
-**Tagline:** Insight → Validate → Prioritize → Act → Deliver  
-
-### CORE PROBLEM
-NGOs receive thousands of help requests daily via forms, WhatsApp, email, and manual entries.  
+NGOs receive thousands of help requests daily via forms, WhatsApp, email, and manual entries.
 Manual review causes delays, misclassification, and missed critical cases (medical emergencies, hunger, child welfare cases).
 
-RaahDo solves this using an **AI multi-agent decision pipeline** that transforms raw requests into verified, prioritized, and dispatched humanitarian actions.
+RaahAI solves this using an AI multi-agent decision pipeline that transforms raw requests into verified, prioritized, and dispatched humanitarian actions.
 
----
+2. SYSTEM ARCHITECTURE
 
-## 2. SYSTEM ARCHITECTURE
-
-```
-
-Flutter App / Web Forms / Email / WhatsApp
+Flutter App / Web Forms / Email / Spreadsheets
 ↓
-FastAPI Gateway (Orchestrator)
+Google Antigravity (The Core Orchestrator)
 ↓
-6-Agent Pipeline (Sequential)
+5-Agent Pipeline (Sequential execution mapped in Antigravity)
 ↓
-Storage + Action Layer
+FastAPI Backend (MCP Tool Server & API Gateway)
 ↓
-Google Sheets + Supabase + SMS + Logs
+Storage + Action Layer (Google Sheets, Firebase, SMS, Logs)
 
-````
+3. CORE PIPELINE (5 AGENTS ONLY)
+Intake Agent (Email & Spreadsheet processing)
+Validation Agent
+Severity & Impact Agent (Merged for efficiency)
+Action Generation Agent
+Dispatch Agent ★ (Execution Engine)
+4. DESIGN PRINCIPLES
+A. Single Responsibility
 
----
-
-## 3. CORE PIPELINE (6 AGENTS ONLY)
-
-1. Intake Agent  
-2. Validation Agent  
-3. Severity / Insight Agent  
-4. Impact Prediction Agent  
-5. Action Generation Agent  
-6. Dispatch Agent ★ (Execution Engine)
-
----
-
-## 4. DESIGN PRINCIPLES
-
-### A. Single Responsibility
 Each agent performs ONLY one defined function.
 
-### B. Stateless Execution
+B. Stateless Execution
+
 No persistent memory inside agents. Everything passed via CaseObject.
 
-### C. Strict JSON Contracts
-All inputs/outputs MUST follow `shared/schemas.py`.
+C. Strict JSON Contracts
 
-### D. Fail-Safe System
+All inputs/outputs MUST follow shared/schemas.py.
+
+D. Fail-Safe System
+
 Invalid cases NEVER reach Dispatch Agent.
 
-### E. Traceability Mandatory
+E. Traceability Mandatory
+
 Every agent MUST append a TraceObject.
 
-### F. Multilingual Support
+F. Multilingual Support
+
 System MUST support:
-- Urdu
-- Roman Urdu
-- English
 
----
+Urdu
+Roman Urdu
+English
+5. FOLDER OWNERSHIP MODEL & PROMPT MANAGEMENT
+Member	Responsibility	Folder
+Member 1	FastAPI MCP Server & Endpoints	backend/
+Member 2	Intake + Validation Agents	agents/intake/ & agents/validation/
+Member 3	Severity/Impact + Action Agents	agents/severity_impact/ & agents/action/
+Member 4	Flutter App	frontend/flutter_app/
 
-## 5. FOLDER OWNERSHIP MODEL
+CRITICAL RULE (prompt.py): Every single agent folder MUST contain a prompt.py file. This file contains the strict system prompts, rules, and boundaries for that specific agent. Antigravity will load these prompts to prevent injection attacks and ensure deterministic behavior.
 
-| Member | Responsibility | Folder |
-|--------|---------------|--------|
-| Member 1 | FastAPI + Pipeline Orchestration | backend/ |
-| Member 2 | Intake + Validation Agents | agents/intake + validation |
-| Member 3 | Severity + Impact Agents | agents/severity + impact |
-| Member 4 | Flutter App | frontend/flutter_app |
+6. SHARED DATA CONTRACT (CRITICAL)
 
----
+Source of truth: shared/schemas.py
 
-## 6. SHARED DATA CONTRACT (CRITICAL)
-
-Source of truth: `shared/schemas.py`
-
-### CASE OBJECT (GLOBAL STANDARD)
-
-```json
+CASE OBJECT (GLOBAL STANDARD)
 {
   "case_id": "uuid",
   "applicant_name": "string",
@@ -110,7 +93,7 @@ Source of truth: `shared/schemas.py`
   "validation_status": "VALID | INVALID | NEED_MORE_INFO | null",
   "severity_score": 0.0,
   "severity_level": "LOW | MEDIUM | HIGH | CRITICAL",
-  "impact_time": "IMMEDIATE | TODAY | THIS_WEEK",
+  "time_sensitivity": "IMMEDIATE | TODAY | THIS_WEEK",
 
   "dispatch_status": "PENDING | PROCESSING | DISPATCHED | FAILED",
   "volunteer_assigned": "string | null",
@@ -119,15 +102,10 @@ Source of truth: `shared/schemas.py`
   "pipeline_stage": "string",
   "agent_trace": []
 }
-````
-
----
-
-## 7. TRACE OBJECT (MANDATORY LOGGING)
+7. TRACE OBJECT (MANDATORY LOGGING)
 
 Every agent MUST append:
 
-```json
 {
   "agent": "string",
   "timestamp": "ISO-8601",
@@ -136,231 +114,93 @@ Every agent MUST append:
   "tool_calls": [],
   "output_summary": "string"
 }
-```
+8. AGENT DEFINITIONS
+8.1 INTAKE AGENT
 
----
+ROLE: Convert raw input into structured CaseObject
 
-## 8. AGENT DEFINITIONS
+INPUT:
 
----
+Google Form
+Email
 
-# 8.1 INTAKE AGENT
+RULES:
 
-### ROLE
+Never decide severity
+Never validate authenticity
+Always preserve raw input
+8.2 VALIDATION AGENT
 
-Convert raw multilingual input into structured CaseObject.
+Detect fraud, duplication, missing fields
 
-### INPUT
+MUST NOT reject without reason
+Must flag issues, not delete cases
+8.3 SEVERITY & IMPACT AGENT
 
-* Flutter form
-* Google Forms
-* Email text
-* WhatsApp text
+Compute urgency + impact time
 
-### OUTPUT
+Signals:
 
-CaseObject (partial filled)
+Medical emergency → +3
+No income → +2
+Children → +2
+Food shortage → +2
 
-### RESPONSIBILITIES
+Output: severity_score + severity_level + impact_time
 
-* Language normalization
-* Field extraction
-* Missing field detection
-* Case ID generation
+8.4 ACTION GENERATION AGENT
 
-### RULES
+Creates real-world NGO action plan
 
-* NEVER decide severity
-* NEVER validate authenticity
-* ALWAYS preserve raw description
+Volunteer request
+Resource plan
 
----
+Must be executable
 
-# 8.2 VALIDATION AGENT
+8.5 DISPATCH AGENT ★ FINAL ENGINE
 
-### ROLE
+Executes actions via MCP tools
 
-Detect fraud, duplication, and completeness issues.
+Google Sheets update
+Volunteer assignment
+Ticket generation
+SMS sending
+9. MCP TOOL USAGE
+Tool	Usage
+Google Sheets MCP	case tracking
+Firebase Firestore	audit logs
+Google Maps MCP	volunteer location
+Playwright MCP	testing
+GitHub MCP	commits
 
-### OUTPUT
+RULE: Only assigned agents can use assigned tools
 
-validation_status + reasons
+10. ORCHESTRATION RULES
+Google Antigravity = ONLY orchestrator
+FastAPI = MCP tool server
+Sequential pipeline only
+No parallel mutation of CaseObject
+11. FAILURE HANDLING
+Never drop cases
+Always mark FAILED
+Always append trace
+12. SECURITY RULES
+No CNIC storage
+Mask sensitive data
+Use synthetic data for demos
+13. TEAM RULES
+No direct main branch push
+PR required
+schemas.py locked
+agents independently testable
+14. SUCCESS CRITERIA
 
-### RULES
+✔ End-to-end automation
+✔ Google Sheet updated to DISPATCHED
+✔ Full trace logs for all agents
+✔ Volunteer assignment works
+✔ Flutter dashboard reflects live status
 
-* Do NOT reject humanitarian cases without justification
-* Duplicate detection required
-* Missing fields must be flagged, not discarded
+FINAL STATEMENT
 
----
-
-# 8.3 SEVERITY / INSIGHT AGENT
-
-### ROLE
-
-Calculate humanitarian urgency score.
-
-### SCORING SYSTEM
-
-* Medical emergency → +3
-* No income → +2
-* Children present → +2
-* Food shortage → +2
-
-### OUTPUT
-
-severity_score + severity_level + reasoning
-
----
-
-# 8.4 IMPACT PREDICTION AGENT
-
-### ROLE
-
-Predict urgency timing of case response.
-
-### OUTPUT
-
-IMMEDIATE / TODAY / THIS_WEEK
-
-### FACTORS
-
-* Severity score
-* Location accessibility
-* Crisis type
-* Resource delay risk
-
----
-
-# 8.5 ACTION GENERATION AGENT
-
-### ROLE
-
-Generate actionable response plan.
-
-### OUTPUT
-
-* recommended actions
-* SMS draft
-* volunteer request
-* resource allocation plan
-
-### RULES
-
-* Must map to real NGO operations
-* Must be executable by Dispatch Agent
-
----
-
-# 8.6 DISPATCH AGENT ★ FINAL ENGINE
-
-### ROLE
-
-Execute real-world simulation actions.
-
-### OPERATIONS
-
-* Assign nearest volunteer (Maps MCP)
-* Update Google Sheets status
-* Insert Supabase log
-* Generate ticket ID
-* Send SMS draft
-
-### OUTPUT
-
-* ticket_id
-* volunteer_assigned
-* DISPATCHED status
-* full audit log
-
----
-
-## 9. MCP TOOL USAGE
-
-| MCP               | Usage                          |
-| ----------------- | ------------------------------ |
-| Google Sheets MCP | case tracking + status updates |
-| Supabase MCP      | permanent logs + audit trail   |
-| Google Maps MCP   | nearest volunteer selection    |
-| Playwright MCP    | testing only                   |
-| GitHub MCP        | auto commits                   |
-
-RULE:
-Agents may ONLY use MCP tools explicitly assigned to them.
-
----
-
-## 10. ORCHESTRATION RULES (FASTAPI + ANTIGRAVITY)
-
-* FastAPI is the ONLY entry point
-* Antigravity controls sequencing
-* Agents run in strict order
-* Each output feeds next agent
-* No parallel mutation of same case object
-
----
-
-## 11. FAILURE HANDLING
-
-If any agent fails:
-
-* set `dispatch_status = FAILED`
-* append trace entry
-* pass forward with error flag
-* NEVER drop case silently
-
----
-
-## 12. SECURITY RULES
-
-* No CNIC storage in logs
-* No sensitive duplication in traces
-* Use masked phone numbers if logging externally
-* All demo data should be synthetic
-
----
-
-## 13. TEAM RULES
-
-* No direct push to main branch
-* PR required for all changes
-* shared/schemas.py cannot be edited without approval
-* Each agent must be independently testable
-
----
-
-## 14. SUCCESS CRITERIA
-
-System is successful only if:
-
-✔ End-to-end case flows without manual intervention
-✔ Sheet shows DISPATCHED update
-✔ Trace log exists for all 6 agents
-✔ Volunteer assignment is simulated correctly
-✔ Flutter app reflects updated status
-
----
-
-## FINAL STATEMENT
-
-RaahDo is not just a chatbot system.
-
-It is an **autonomous humanitarian decision pipeline** that transforms human suffering signals into structured, prioritized, and executed real-world actions using AI agents.
-
-```
-
----
-
-## If you want next upgrade (important)
-I can also generate:
-
-1. :contentReference[oaicite:0]{index=0}
-2. :contentReference[oaicite:1]{index=1}
-3. `FastAPI routes.py (ready to run)`
-4. :contentReference[oaicite:2]{index=2}
-5. :contentReference[oaicite:3]{index=3}
-
-Just tell me.
-
-But honestly — your system is now **hackathon-winning level if implemented correctly**.
-```
+RaahAI is not just a chatbot system. It is an autonomous humanitarian decision pipeline that transforms human suffering signals into structured, prioritized, and executed real-world actions using AI agents.

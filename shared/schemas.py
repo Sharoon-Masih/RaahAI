@@ -1,8 +1,9 @@
 # shared/schemas.py
 # ============================================================
-# SINGLE SOURCE OF TRUTH — All Pydantic models for RaahDo
+# SINGLE SOURCE OF TRUTH — All Pydantic models for RaahAI
 # DO NOT DUPLICATE these in agent files — always import from here.
 # DO NOT MODIFY without team consensus (Member 1 owns this file).
+# DATABASE: Firebase Firestore ONLY — no SQL, no Supabase.
 # ============================================================
 
 from pydantic import BaseModel, Field, field_validator
@@ -94,14 +95,14 @@ class CaseObject(BaseModel):
     """
     The central data object that flows through the entire pipeline.
     Each agent receives this, adds its fields, and passes it on.
-    Only Dispatch Agent writes to external systems.
+    Only Dispatch Agent writes to external systems (via FastAPI → Firebase).
     """
 
     # ── Core Identity (set by Intake Agent)
     case_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    applicant_name: str = ""
-    phone: str = ""
-    location_normalized: str = ""
+    applicant_name: Optional[str] = None          # null if not found in input
+    phone: Optional[str] = None                   # null if no valid PK number
+    location_normalized: Optional[str] = None     # null if unrecognizable
     crisis_type: Optional[str] = None
     family_size: int = 1
     income_monthly: int = 0
@@ -155,6 +156,21 @@ class CaseObject(BaseModel):
             self.severity_level == SeverityLevel.CRITICAL or
             self.time_sensitivity == TimeSensitivity.IMMEDIATE
         )
+
+    def to_firestore_dict(self) -> dict:
+        """
+        Serialize CaseObject to a Firestore-safe dict.
+        Converts Enum values to their string equivalents.
+        Converts nested TraceObject list to plain dicts.
+        """
+        data = self.model_dump(mode="json")
+        # Flatten enums to their values (Pydantic mode='json' handles this)
+        # Convert agent_trace TraceObjects to dicts
+        data["agent_trace"] = [
+            t if isinstance(t, dict) else t.model_dump(mode="json")
+            for t in self.agent_trace
+        ]
+        return data
 
 
 # ── API RESPONSE MODELS ─────────────────────────────────────

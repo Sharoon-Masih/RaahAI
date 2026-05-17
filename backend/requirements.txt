@@ -1,0 +1,29 @@
+# ============================================================
+# backend/requirements.txt
+# RaahAI FastAPI MCP Server — Production Dependencies
+# ============================================================
+
+# Web Framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Data validation (must match shared/schemas.py)
+pydantic==2.10.3
+
+# Firebase Admin SDK (Firestore + Auth)
+firebase-admin==6.6.0
+
+# Google Generative AI (Gemini API for agent calls)
+google-generativeai==0.8.3
+
+# HTTP client (for inter-service calls)
+httpx==0.28.1
+
+# Environment variable management
+python-dotenv==1.0.1
+
+# Logging
+structlog==24.4.0
+
+# CORS & security
+python-multipart==0.0.12
