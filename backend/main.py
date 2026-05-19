@@ -16,6 +16,7 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 
+# pyrefly: ignore [missing-import]
 import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,7 +35,6 @@ from backend.services.mcp_router import mcp_router
 structlog.configure(
     processors=[
         structlog.stdlib.add_log_level,
-        structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.JSONRenderer(),
     ],
@@ -154,7 +154,7 @@ async def root():
         "system": "RaahAI MCP Tool Server",
         "version": "1.0.0",
         "status": "operational",
-        "pipeline": "Intake → Validation → Severity → Impact → Dispatch",
+        "pipeline": "Intake → Validation → Severity&Impact → Action → Dispatch",
         "database": "Firebase Firestore",
     }
 

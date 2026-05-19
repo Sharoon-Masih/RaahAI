@@ -6,8 +6,8 @@
 # ORDER (strictly enforced):
 #   1. Intake Agent
 #   2. Validation Agent
-#   3. Severity Agent
-#   4. Impact Agent
+#   3. Severity & Impact Agent
+#   4. Action Generation Agent
 #   5. Dispatch Agent
 #
 # RULES:
@@ -19,6 +19,7 @@
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import datetime, timezone
 
 from shared.schemas import CaseObject, DispatchStatus, TraceObject
@@ -44,6 +45,7 @@ async def run_pipeline(raw_input: str, submission_source: str = "web_form") -> C
         stage_name="IntakeAgent",
         coro=_run_intake(raw_input, submission_source),
     )
+    await asyncio.sleep(3)
 
     # ── Stage 2: Validation Agent ────────────────────────────
     case = await _run_stage(
@@ -51,20 +53,23 @@ async def run_pipeline(raw_input: str, submission_source: str = "web_form") -> C
         coro=_run_validation(case),
         case=case,
     )
+    await asyncio.sleep(3)
 
-    # ── Stage 3: Severity Agent ──────────────────────────────
+    # ── Stage 3: Severity & Impact Agent ─────────────────────
     case = await _run_stage(
-        stage_name="SeverityAgent",
-        coro=_run_severity(case),
+        stage_name="SeverityImpactAgent",
+        coro=_run_severity_impact(case),
         case=case,
     )
+    await asyncio.sleep(3)
 
-    # ── Stage 4: Impact Agent ────────────────────────────────
+    # ── Stage 4: Action Generation Agent ─────────────────────
     case = await _run_stage(
-        stage_name="ImpactAgent",
-        coro=_run_impact(case),
+        stage_name="ActionAgent",
+        coro=_run_action(case),
         case=case,
     )
+    await asyncio.sleep(3)
 
     # ── Stage 5: Dispatch Agent ──────────────────────────────
     case = await _run_stage(
@@ -92,13 +97,13 @@ async def _run_validation(case: CaseObject) -> CaseObject:
     return await run(case)
 
 
-async def _run_severity(case: CaseObject) -> CaseObject:
-    from agents.severity.agent import run
+async def _run_severity_impact(case: CaseObject) -> CaseObject:
+    from agents.severity_impact.agent import run
     return await run(case)
 
 
-async def _run_impact(case: CaseObject) -> CaseObject:
-    from agents.impact.agent import run
+async def _run_action(case: CaseObject) -> CaseObject:
+    from agents.action.agent import run
     return await run(case)
 
 

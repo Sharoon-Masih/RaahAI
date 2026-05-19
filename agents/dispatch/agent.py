@@ -114,6 +114,7 @@ async def run(case: CaseObject) -> CaseObject:
         system_prompt=DISPATCH_AGENT_SYSTEM_PROMPT,
         user_message=volunteer_context,
         temperature=0.4,
+        model_name="gemini-2.5-flash",
     )
 
     # ── Fallback if Gemini fails ─────────────────────────────

@@ -38,8 +38,8 @@ async def submit_raw(req: SubmitRawRequest) -> dict:
 
     1. Intake Agent  → structures raw text into CaseObject
     2. Validation    → authenticates and flags case
-    3. Severity      → scores urgency 1–10
-    4. Impact        → predicts time sensitivity
+    3. Severity & Impact → scores urgency and predicts time sensitivity
+    4. Action        → generates execution plan and resource requests
     5. Dispatch      → assigns volunteer, generates ticket + SMS
 
     Returns the complete processed CaseObject.

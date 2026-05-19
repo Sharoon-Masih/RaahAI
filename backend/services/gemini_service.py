@@ -73,6 +73,7 @@ async def run_agent_prompt(
     user_message: str,
     temperature: float = 0.2,
     max_retries: int = 2,
+    model_name: Optional[str] = None,
 ) -> Optional[dict]:
     """
     Send a prompt to Gemini and return parsed JSON response.
@@ -89,8 +90,9 @@ async def run_agent_prompt(
     if not _initialized:
         initialize_gemini()
 
+    actual_model = model_name or settings.GEMINI_MODEL
     model = genai.GenerativeModel(
-        model_name=settings.GEMINI_MODEL,
+        model_name=actual_model,
         system_instruction=system_prompt,
         generation_config=genai.GenerationConfig(
             temperature=temperature,
@@ -131,4 +133,5 @@ async def run_intake_agent(raw_input: str) -> Optional[dict]:
         system_prompt=INTAKE_AGENT_SYSTEM_PROMPT,
         user_message=raw_input,
         temperature=0.1,  # Very low — deterministic extraction
+        model_name="gemini-3.1-flash-lite",
     )

@@ -119,17 +119,20 @@ class CaseObject(BaseModel):
     validation_reasons: List[str] = Field(default_factory=list)
     fraud_signals: List[str] = Field(default_factory=list)
 
-    # ── Severity (set by Severity Agent)
+    # ── Severity & Impact (set by SeverityImpact Agent)
     severity_score: Optional[float] = Field(default=None, ge=0.0, le=10.0)
     severity_level: Optional[SeverityLevel] = None
     key_insight: Optional[str] = None
     scoring_breakdown: Optional[dict] = None
     compound_crisis_detected: bool = False
-
-    # ── Impact (set by Impact Agent)
     time_sensitivity: Optional[TimeSensitivity] = None
     delay_consequence: Optional[str] = None
     location_risk_factor: Optional[str] = None
+
+    # ── Action Generation (set by Action Agent)
+    action_plan: Optional[str] = None
+    resource_request: Optional[str] = None
+    volunteer_profile_request: Optional[str] = None
 
     # ── Dispatch (set by Dispatch Agent)
     volunteer_assigned: Optional[str] = None
