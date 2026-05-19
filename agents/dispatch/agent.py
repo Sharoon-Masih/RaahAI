@@ -118,6 +118,7 @@ async def run(case: CaseObject) -> CaseObject:
                 "action_plan": case.action_plan,
                 "resource_request": case.resource_request,
                 "ticket_id": ticket_id,
+                "assigned_ngo_id": case.assigned_ngo_id,
                 "timestamp": timestamp_str,
             }
             await mcp_router.route("sheets", "update_or_append_case", sheets_payload)
@@ -260,6 +261,7 @@ async def run(case: CaseObject) -> CaseObject:
             "action_plan": case.action_plan,
             "resource_request": case.resource_request,
             "ticket_id": ticket_id,
+            "assigned_ngo_id": case.assigned_ngo_id,
             "timestamp": dispatch_log["dispatched_at"],
         }
         await mcp_router.route("sheets", "update_or_append_case", sheets_payload)
@@ -323,6 +325,7 @@ async def _persist_to_firebase(
             "dispatch_status": case.dispatch_status.value,
             "pipeline_stage": case.pipeline_stage,
             "volunteer_assigned": case.volunteer_assigned,
+            "assigned_ngo_id": case.assigned_ngo_id,
             "ticket_id": ticket_id,
             "sms_draft": case.sms_draft,
             "agent_trace": [

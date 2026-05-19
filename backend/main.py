@@ -26,6 +26,7 @@ from backend.config import settings
 from backend.routes import firebase as firebase_router
 from backend.routes import ingestion as ingestion_router
 from backend.routes import pipeline as pipeline_router
+from backend.routes import ngos as ngos_router
 from backend.services import firebase_service
 from backend.services import gemini_service
 from backend.services import sheets_service
@@ -146,6 +147,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(ingestion_router.router, prefix=settings.API_PREFIX)
 app.include_router(firebase_router.router, prefix=settings.API_PREFIX)
 app.include_router(pipeline_router.router, prefix=settings.API_PREFIX)
+app.include_router(ngos_router.router, prefix=settings.API_PREFIX)
 
 
 # ── Health & Root ────────────────────────────────────────────

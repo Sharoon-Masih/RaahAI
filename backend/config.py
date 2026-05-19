@@ -25,6 +25,7 @@ class Settings:
     COLLECTION_TRACES: str = "traces"
     COLLECTION_DISPATCH_LOGS: str = "dispatch_logs"
     COLLECTION_VOLUNTEERS: str = "volunteers"
+    COLLECTION_NGOS: str = "ngos"
 
     # ── Gemini API ───────────────────────────────────────────
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")

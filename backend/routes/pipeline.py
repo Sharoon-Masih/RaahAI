@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 
+from typing import Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
@@ -24,6 +25,7 @@ router = APIRouter(prefix="/submit", tags=["Pipeline"])
 class SubmitRawRequest(BaseModel):
     raw_input: str
     submission_source: str = "web_form"
+    assigned_ngo_id: Optional[str] = None
 
 
 @router.post(
@@ -48,6 +50,7 @@ async def submit_raw(req: SubmitRawRequest) -> dict:
         case = await run_pipeline(
             raw_input=req.raw_input,
             submission_source=req.submission_source,
+            assigned_ngo_id=req.assigned_ngo_id,
         )
     except Exception as exc:
         logger.error(f"[Pipeline] Unhandled error: {exc}")

@@ -1,0 +1,239 @@
+{
+  "info": {
+    "name": "RaahAI Backend Endpoints",
+    "description": "Comprehensive Postman collection for all RaahAI FastAPI MCP Server endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "System Status",
+      "item": [
+        {
+          "name": "Root Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            }
+          }
+        },
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "NGO Authentication",
+      "item": [
+        {
+          "name": "Register NGO",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Care Foundation\",\n  \"email\": \"care@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"crisis_types\": [\"food\", \"medical\"],\n  \"locations\": [\"Lahore\", \"Karachi\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/ngos/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ngos", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login NGO",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"care@example.com\",\n  \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/ngos/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ngos", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pipeline Execution",
+      "item": [
+        {
+          "name": "Submit Raw Case (End-to-End)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"raw_input\": \"Mujhe ration chahiye mera ghar lahore mein hai aur 5 bachay hain.\",\n  \"submission_source\": \"web_form\",\n  \"assigned_ngo_id\": \"<INSERT_NGO_ID_HERE>\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/submit/raw",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "submit", "raw"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Intake & Ingestion",
+      "item": [
+        {
+          "name": "Ingest Structured Case",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": \"test-case-id\",\n  \"pipeline_stage\": \"INTAKE_COMPLETE\",\n  \"dispatch_status\": \"PENDING\",\n  \"agent_trace\": [\n    {\n      \"agent\": \"IntakeAgent\",\n      \"timestamp\": \"2026-05-20T10:00:00Z\",\n      \"action\": \"Ingest\",\n      \"reasoning\": \"Processed text\",\n      \"output_summary\": \"Case initialized\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/ingest-case",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ingest-case"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Firebase Toolkit (MCP Backend)",
+      "item": [
+        {
+          "name": "List Cases",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/firebase/cases",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "firebase", "cases"]
+            }
+          }
+        },
+        {
+          "name": "Get Single Case",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/firebase/cases/<case_id>",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "firebase", "cases", "<case_id>"]
+            }
+          }
+        },
+        {
+          "name": "List Available Volunteers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/firebase/volunteers",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "firebase", "volunteers"]
+            }
+          }
+        },
+        {
+          "name": "Get Aggregate Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/firebase/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "firebase", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Update Case Status",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": \"<case_id>\",\n  \"dispatch_status\": \"PROCESSING\",\n  \"pipeline_stage\": \"action_agent\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/firebase/update-case-status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "firebase", "update-case-status"]
+            }
+          }
+        },
+        {
+          "name": "Log Single Trace",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"case_id\": \"<case_id>\",\n  \"trace\": {\n    \"agent\": \"ValidationAgent\",\n    \"timestamp\": \"2026-05-20T10:05:00Z\",\n    \"action\": \"Validate\",\n    \"reasoning\": \"Looks good\",\n    \"output_summary\": \"Verified\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/firebase/log-trace",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "firebase", "log-trace"]
+            }
+          }
+        },
+        {
+          "name": "Log Dispatch",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ticket_id\": \"TKT-123\",\n  \"log\": {\n    \"volunteer_assigned\": \"Ali\",\n    \"sms_draft\": \"Assalam O Alaikum\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/firebase/log-dispatch",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "firebase", "log-dispatch"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

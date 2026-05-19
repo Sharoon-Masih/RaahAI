@@ -25,7 +25,7 @@ _sheets_client = None
 # Tab list configuration
 TABS = ["high_priority", "low_priority", "rejected"]
 
-# 21-column schema headers
+# 22-column schema headers
 HEADERS = [
     "Case ID",
     "Applicant Name",
@@ -47,7 +47,8 @@ HEADERS = [
     "Action Plan",
     "Resource Request",
     "Ticket ID",
-    "Timestamp"
+    "Timestamp",
+    "Assigned NGO ID"
 ]
 
 
@@ -120,6 +121,7 @@ async def update_or_append_case(
     action_plan: Optional[str],
     resource_request: Optional[str],
     ticket_id: Optional[str],
+    assigned_ngo_id: Optional[str] = None,
     timestamp: Optional[str] = None,
 ) -> None:
     """
@@ -251,7 +253,7 @@ async def update_or_append_case(
                 # Non-fatal: continue even if deletion fails
 
     # ── Step 3: Ensure headers are written in the target sheet ──
-    range_name = f"'{target_sheet}'!A:U"
+    range_name = f"'{target_sheet}'!A:V"
     try:
         target_res = client.spreadsheets().values().get(
             spreadsheetId=spreadsheet_id,
@@ -266,7 +268,7 @@ async def update_or_append_case(
         try:
             client.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
-                range=f"'{target_sheet}'!A1:U1",
+                range=f"'{target_sheet}'!A1:V1",
                 valueInputOption="RAW",
                 body={"values": [HEADERS]},
             ).execute()
@@ -285,7 +287,7 @@ async def update_or_append_case(
             existing_row_idx = idx + 1
             break
 
-    # Build the 21-column data record (excluding volunteer and dispatch status)
+    # Build the 22-column data record (excluding volunteer and dispatch status)
     new_row = [
         case_id,
         applicant_name or "",
@@ -308,16 +310,17 @@ async def update_or_append_case(
         resource_request or "",
         ticket_id or "",
         timestamp,
+        assigned_ngo_id or "",
     ]
 
-    # Fill up to 21 elements if shorter
-    while len(new_row) < 21:
+    # Fill up to 22 elements if shorter
+    while len(new_row) < 22:
         new_row.append("")
 
     # ── Step 5: Perform Update or Append inside Target Sheet ──
     if existing_row_idx != -1:
         # Update existing row
-        target_range = f"'{target_sheet}'!A{existing_row_idx}:U{existing_row_idx}"
+        target_range = f"'{target_sheet}'!A{existing_row_idx}:V{existing_row_idx}"
         try:
             client.spreadsheets().values().update(
                 spreadsheetId=spreadsheet_id,
@@ -336,7 +339,7 @@ async def update_or_append_case(
         try:
             client.spreadsheets().values().append(
                 spreadsheetId=spreadsheet_id,
-                range=f"'{target_sheet}'!A:U",
+                range=f"'{target_sheet}'!A:V",
                 valueInputOption="RAW",
                 insertDataOption="INSERT_ROWS",
                 body={"values": [new_row]},
