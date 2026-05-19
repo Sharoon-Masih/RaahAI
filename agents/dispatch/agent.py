@@ -59,6 +59,7 @@ async def run(case: CaseObject) -> CaseObject:
     """Run Dispatch Agent on a fully processed CaseObject."""
     from backend.services.gemini_service import run_agent_prompt
     from backend.services import firebase_service
+    from backend.services.mcp_router import mcp_router
     from agents.dispatch.prompt import DISPATCH_AGENT_SYSTEM_PROMPT
 
     logger.info(f"[DispatchAgent] Processing case {case.case_id}...")
@@ -75,6 +76,26 @@ async def run(case: CaseObject) -> CaseObject:
         case.dispatch_status = DispatchStatus.FAILED
         case.volunteer_assigned = None
         case.pipeline_stage = "dispatch_agent"
+
+        # ── Update Google Sheets (Failsafe) ─────────────────────
+        try:
+            sheets_payload = {
+                "case_id": case.case_id,
+                "status": "FAILED",
+                "severity_score": case.severity_score,
+                "severity_level": str(case.severity_level.value) if case.severity_level else None,
+                "time_sensitivity": str(case.time_sensitivity.value) if case.time_sensitivity else None,
+                "volunteer_assigned": None,
+                "ticket_id": ticket_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            await mcp_router.route("sheets", "update_or_append_case", sheets_payload)
+            logger.info(f"[DispatchAgent] Google Sheets updated successfully to FAILED.")
+            sheets_ok = True
+        except Exception as exc:
+            logger.error(f"[DispatchAgent] Google Sheets update failed on FAILED case: {exc}")
+            sheets_ok = False
+
         case.append_trace(TraceObject(
             agent="DispatchAgent",
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -83,8 +104,8 @@ async def run(case: CaseObject) -> CaseObject:
                 f"Case is FAILED or INVALID. "
                 f"Ticket {ticket_id} generated for tracking. No volunteer assigned."
             ),
-            tool_calls=[],
-            output_summary=f"FAILED. Ticket: {ticket_id}. No dispatch.",
+            tool_calls=["sheets_mcp:update_row"] if sheets_ok else [],
+            output_summary=f"FAILED. Ticket: {ticket_id}. No dispatch. Sheet updated.",
         ))
         await _persist_to_firebase(case, ticket_id, dispatch_log=None)
         return case
@@ -168,13 +189,37 @@ async def run(case: CaseObject) -> CaseObject:
         "volunteer_instruction": result.get("volunteer_instruction", ""),
     }
 
+    # ── Update Google Sheets ─────────────────────────────────
+    try:
+        sheets_payload = {
+            "case_id": case.case_id,
+            "status": str(case.dispatch_status.value) if case.dispatch_status else "PENDING",
+            "severity_score": case.severity_score,
+            "severity_level": str(case.severity_level.value) if case.severity_level else None,
+            "time_sensitivity": str(case.time_sensitivity.value) if case.time_sensitivity else None,
+            "volunteer_assigned": case.volunteer_assigned,
+            "ticket_id": ticket_id,
+            "timestamp": dispatch_log["dispatched_at"],
+        }
+        await mcp_router.route("sheets", "update_or_append_case", sheets_payload)
+        logger.info(f"[DispatchAgent] Google Sheets updated successfully.")
+        sheets_ok = True
+    except Exception as exc:
+        logger.error(f"[DispatchAgent] Google Sheets update failed: {exc}")
+        sheets_ok = False
+
     # ── Append trace ─────────────────────────────────────────
     tool_calls = [
         "firebase_firestore:volunteers_query (via FastAPI)",
         "gemini_api:sms_generation",
+    ]
+    if sheets_ok:
+        tool_calls.append("sheets_mcp:update_row")
+    tool_calls.extend([
         "firebase_firestore:dispatch_log_insert (via FastAPI)",
         "firebase_firestore:case_update (via FastAPI)",
-    ]
+    ])
+    
     case.append_trace(TraceObject(
         agent="DispatchAgent",
         timestamp=datetime.now(timezone.utc).isoformat(),
@@ -188,7 +233,8 @@ async def run(case: CaseObject) -> CaseObject:
         tool_calls=tool_calls,
         output_summary=(
             f"{case.dispatch_status}. Volunteer: {case.volunteer_assigned}. "
-            f"Ticket: {ticket_id}. SMS drafted. Firebase logged."
+            f"Ticket: {ticket_id}. SMS drafted. Firebase logged." +
+            (" Sheet updated." if sheets_ok else "")
         ),
     ))
 

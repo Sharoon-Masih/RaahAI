@@ -1,0 +1,24 @@
+# ============================================================
+# .env.example — RaahAI Environment Variables Template
+# Copy to .env and fill in real values.
+# NEVER commit .env to Git.
+# ============================================================
+
+# ── Firebase ─────────────────────────────────────────────────
+# Path to your downloaded Firebase service account JSON
+FIREBASE_SERVICE_ACCOUNT_PATH=D:\production app\RaahAI\firebase_cred.json
+
+# Firebase project ID (used when ADC is enabled instead of service account)
+FIREBASE_PROJECT_ID=raahai-88fd2
+
+# ── Gemini API ───────────────────────────────────────────────
+GEMINI_API_KEY=AIzaSyAWAFUK5tYYJYnFNSADvk5TGDrTkVHsEcw
+
+# ── Google Sheets ────────────────────────────────────────────
+# The ID from your Google Sheets URL:
+# https://docs.google.com/spreadsheets/d/{GOOGLE_SHEETS_ID}/edit
+GOOGLE_SHEETS_ID=13iNARc1CyhQwJvrZFZFsJxxaqoF7BeIEooVSyUL7gOU
+
+# ── Application ──────────────────────────────────────────────
+# Set to "production" on deployment
+APP_ENV=development

@@ -22,7 +22,7 @@ class MCPRouter:
     Tool Registry:
       firebase   → backend/services/firebase_service.py
       gemini     → backend/services/gemini_service.py (future)
-      sheets     → backend/services/sheets_service.py (future)
+      sheets     → backend/services/sheets_service.py
       maps       → backend/services/maps_service.py (future)
     """
 
