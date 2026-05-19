@@ -68,32 +68,63 @@ async def run(case: CaseObject) -> CaseObject:
     ticket_id = _generate_ticket_id(case.case_id)
     case.ticket_id = ticket_id
 
-    # ── Short-circuit: FAILED / INVALID cases ───────────────
-    if (
+    # ── Target sheet classification ─────────────────────────
+    # 1. Rejected Sheet: Triggered if validation_status == INVALID, dispatch_status == FAILED, or pipeline_stage == "INTAKE_FAILED"
+    # 2. High Priority Sheet: Triggered for all non-rejected cases where severity_level in [HIGH, CRITICAL] or time_sensitivity in [IMMEDIATE, TODAY]
+    # 3. Low Priority Sheet: Triggered for all other cases
+    is_rejected = (
         case.dispatch_status == DispatchStatus.FAILED
         or case.validation_status == ValidationStatus.INVALID
+        or case.pipeline_stage == "INTAKE_FAILED"
+    )
+    if is_rejected:
+        target_sheet = "rejected"
+    elif (
+        (case.severity_level and case.severity_level.value in ["HIGH", "CRITICAL"])
+        or (case.time_sensitivity and case.time_sensitivity.value in ["IMMEDIATE", "TODAY"])
     ):
+        target_sheet = "high_priority"
+    else:
+        target_sheet = "low_priority"
+
+    # ── Short-circuit: FAILED / INVALID cases ───────────────
+    if is_rejected:
         case.dispatch_status = DispatchStatus.FAILED
         case.volunteer_assigned = None
         case.pipeline_stage = "dispatch_agent"
 
         # ── Update Google Sheets (Failsafe) ─────────────────────
         try:
+            timestamp_str = datetime.now(timezone.utc).isoformat()
             sheets_payload = {
+                "target_sheet": "rejected",
                 "case_id": case.case_id,
-                "status": "FAILED",
+                "applicant_name": case.applicant_name,
+                "phone": case.phone,
+                "location": case.location_normalized,
+                "crisis_type": case.crisis_type,
+                "family_size": case.family_size,
+                "income_monthly": case.income_monthly,
+                "description_original": case.description_original or "",
+                "description_en": case.description_en or "",
+                "validation_status": str(case.validation_status.value) if case.validation_status else None,
+                "validation_reasons": case.validation_reasons or [],
+                "fraud_signals": case.fraud_signals or [],
                 "severity_score": case.severity_score,
                 "severity_level": str(case.severity_level.value) if case.severity_level else None,
                 "time_sensitivity": str(case.time_sensitivity.value) if case.time_sensitivity else None,
-                "volunteer_assigned": None,
+                "key_insight": case.key_insight,
+                "delay_consequence": case.delay_consequence,
+                "action_plan": case.action_plan,
+                "resource_request": case.resource_request,
                 "ticket_id": ticket_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": timestamp_str,
             }
             await mcp_router.route("sheets", "update_or_append_case", sheets_payload)
-            logger.info(f"[DispatchAgent] Google Sheets updated successfully to FAILED.")
+            logger.info(f"[DispatchAgent] Google Sheets updated successfully to rejected.")
             sheets_ok = True
         except Exception as exc:
-            logger.error(f"[DispatchAgent] Google Sheets update failed on FAILED case: {exc}")
+            logger.error(f"[DispatchAgent] Google Sheets update failed on rejected case: {exc}")
             sheets_ok = False
 
         case.append_trace(TraceObject(
@@ -190,19 +221,49 @@ async def run(case: CaseObject) -> CaseObject:
     }
 
     # ── Update Google Sheets ─────────────────────────────────
+    # Recheck target sheet classification
+    is_rejected = (
+        case.dispatch_status == DispatchStatus.FAILED
+        or case.validation_status == ValidationStatus.INVALID
+        or case.pipeline_stage == "INTAKE_FAILED"
+    )
+    if is_rejected:
+        target_sheet = "rejected"
+    elif (
+        (case.severity_level and case.severity_level.value in ["HIGH", "CRITICAL"])
+        or (case.time_sensitivity and case.time_sensitivity.value in ["IMMEDIATE", "TODAY"])
+    ):
+        target_sheet = "high_priority"
+    else:
+        target_sheet = "low_priority"
+
     try:
         sheets_payload = {
+            "target_sheet": target_sheet,
             "case_id": case.case_id,
-            "status": str(case.dispatch_status.value) if case.dispatch_status else "PENDING",
+            "applicant_name": case.applicant_name,
+            "phone": case.phone,
+            "location": case.location_normalized,
+            "crisis_type": case.crisis_type,
+            "family_size": case.family_size,
+            "income_monthly": case.income_monthly,
+            "description_original": case.description_original or "",
+            "description_en": case.description_en or "",
+            "validation_status": str(case.validation_status.value) if case.validation_status else None,
+            "validation_reasons": case.validation_reasons or [],
+            "fraud_signals": case.fraud_signals or [],
             "severity_score": case.severity_score,
             "severity_level": str(case.severity_level.value) if case.severity_level else None,
             "time_sensitivity": str(case.time_sensitivity.value) if case.time_sensitivity else None,
-            "volunteer_assigned": case.volunteer_assigned,
+            "key_insight": case.key_insight,
+            "delay_consequence": case.delay_consequence,
+            "action_plan": case.action_plan,
+            "resource_request": case.resource_request,
             "ticket_id": ticket_id,
             "timestamp": dispatch_log["dispatched_at"],
         }
         await mcp_router.route("sheets", "update_or_append_case", sheets_payload)
-        logger.info(f"[DispatchAgent] Google Sheets updated successfully.")
+        logger.info(f"[DispatchAgent] Google Sheets updated successfully to {target_sheet}.")
         sheets_ok = True
     except Exception as exc:
         logger.error(f"[DispatchAgent] Google Sheets update failed: {exc}")
