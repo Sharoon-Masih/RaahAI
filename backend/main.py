@@ -12,6 +12,8 @@
 #   Dispatch Agent     → GET  /api/v1/firebase/volunteers
 # ============================================================
 
+import shared.transport
+import shared.session
 import logging
 import sys
 from contextlib import asynccontextmanager
@@ -142,12 +144,15 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# ── Routers ──────────────────────────────────────────────────
+from backend.routes import dashboard as dashboard_router
+from backend.routes import applications as applications_router
 
 app.include_router(ingestion_router.router, prefix=settings.API_PREFIX)
 app.include_router(firebase_router.router, prefix=settings.API_PREFIX)
 app.include_router(pipeline_router.router, prefix=settings.API_PREFIX)
 app.include_router(ngos_router.router, prefix=settings.API_PREFIX)
+app.include_router(dashboard_router.router, prefix=settings.API_PREFIX)
+app.include_router(applications_router.router, prefix=settings.API_PREFIX)
 
 
 # ── Health & Root ────────────────────────────────────────────

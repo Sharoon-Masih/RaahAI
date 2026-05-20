@@ -132,6 +132,16 @@ async def list_cases(limit: int = 100, status_filter: Optional[str] = None) -> l
     return [d.to_dict() for d in docs]
 
 
+async def list_cases_for_ngo(ngo_id: str) -> list[dict]:
+    """Fetch all cases assigned to a specific NGO for dashboard/application filtering."""
+    from google.cloud.firestore_v1.base_query import FieldFilter
+    col = _col(settings.COLLECTION_CASES)
+    # We fetch all because we'll do in-memory filtering as requested
+    query = col.where(filter=FieldFilter("assigned_ngo_id", "==", ngo_id))
+    docs = query.stream()
+    return [d.to_dict() for d in docs]
+
+
 # ── traces/ ─────────────────────────────────────────────────
 
 async def write_trace(case_id: str, trace_dict: dict) -> None:
