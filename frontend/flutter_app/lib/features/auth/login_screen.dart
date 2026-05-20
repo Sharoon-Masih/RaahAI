@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants/app_colors.dart';
@@ -199,14 +200,21 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                   children: [
                                     Text(
                                       'Welcome back',
-                                      style: AppTextStyles.heading3(color: Colors.white),
+                                      style: GoogleFonts.syne(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       'Sign in to your NGO account',
-                                      style: AppTextStyles.bodySmall(color: AppColors.textMuted),
+                                      style: GoogleFonts.ibmPlexSans(
+                                        fontSize: 13,
+                                        color: AppColors.textMuted,
+                                      ),
                                     ),
-                                    const SizedBox(height: 24),
+                                    const SizedBox(height: 16),
 
                                     // Email Field
                                     Text(
@@ -262,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                         ),
                                       ),
                                     ),
-                                    const SizedBox(height: 24),
+                                    const SizedBox(height: 20),
 
                                     // Sign In Button
                                     SizedBox(
@@ -286,23 +294,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                                   valueColor: AlwaysStoppedAnimation<Color>(AppColors.background),
                                                 ),
                                               )
-                                            : Row(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  Text(
-                                                    'Sign In ',
-                                                    style: AppTextStyles.heading4(color: AppColors.background),
-                                                  ),
-                                                  const Icon(
-                                                    Icons.arrow_forward,
-                                                    color: AppColors.background,
-                                                    size: 18,
-                                                  )
-                                                ],
+                                            : Text(
+                                                'Sign In →',
+                                                style: GoogleFonts.syne(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: AppColors.background,
+                                                ),
                                               ),
                                       ),
                                     ),
-                                    const SizedBox(height: 20),
+                                    const SizedBox(height: 16),
 
                                     // Register Navigation option
                                     Center(
