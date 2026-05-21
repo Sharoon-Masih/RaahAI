@@ -72,7 +72,7 @@ async def run(case: CaseObject) -> CaseObject:
         system_prompt=VALIDATION_AGENT_SYSTEM_PROMPT,
         user_message=user_message,
         temperature=0.1,
-        model_name="gemini-2.5-flash",
+        model_name="gemini-3.1-flash-lite",
     )
 
     # ── Default on Gemini failure: NEED_MORE_INFO (never block) ──

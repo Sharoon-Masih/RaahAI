@@ -59,6 +59,7 @@ async def run(case: CaseObject) -> CaseObject:
     """Run Dispatch Agent on a fully processed CaseObject."""
     from backend.services.gemini_service import run_agent_prompt
     from backend.services import firebase_service
+    from backend.services.mcp_router import mcp_router
     from agents.dispatch.prompt import DISPATCH_AGENT_SYSTEM_PROMPT
 
     logger.info(f"[DispatchAgent] Processing case {case.case_id}...")
@@ -67,14 +68,66 @@ async def run(case: CaseObject) -> CaseObject:
     ticket_id = _generate_ticket_id(case.case_id)
     case.ticket_id = ticket_id
 
-    # ── Short-circuit: FAILED / INVALID cases ───────────────
-    if (
+    # ── Target sheet classification ─────────────────────────
+    # 1. Rejected Sheet: Triggered if validation_status == INVALID, dispatch_status == FAILED, or pipeline_stage == "INTAKE_FAILED"
+    # 2. High Priority Sheet: Triggered for all non-rejected cases where severity_level in [HIGH, CRITICAL] or time_sensitivity in [IMMEDIATE, TODAY]
+    # 3. Low Priority Sheet: Triggered for all other cases
+    is_rejected = (
         case.dispatch_status == DispatchStatus.FAILED
         or case.validation_status == ValidationStatus.INVALID
+        or case.pipeline_stage == "INTAKE_FAILED"
+    )
+    if is_rejected:
+        target_sheet = "rejected"
+    elif (
+        (case.severity_level and case.severity_level.value in ["HIGH", "CRITICAL"])
+        or (case.time_sensitivity and case.time_sensitivity.value in ["IMMEDIATE", "TODAY"])
     ):
+        target_sheet = "high_priority"
+    else:
+        target_sheet = "low_priority"
+
+    # ── Short-circuit: FAILED / INVALID cases ───────────────
+    if is_rejected:
         case.dispatch_status = DispatchStatus.FAILED
         case.volunteer_assigned = None
         case.pipeline_stage = "dispatch_agent"
+
+        # ── Update Google Sheets (Failsafe) ─────────────────────
+        try:
+            timestamp_str = datetime.now(timezone.utc).isoformat()
+            sheets_payload = {
+                "target_sheet": "rejected",
+                "case_id": case.case_id,
+                "applicant_name": case.applicant_name,
+                "phone": case.phone,
+                "location": case.location_normalized,
+                "crisis_type": case.crisis_type,
+                "family_size": case.family_size,
+                "income_monthly": case.income_monthly,
+                "description_original": case.description_original or "",
+                "description_en": case.description_en or "",
+                "validation_status": str(case.validation_status.value) if case.validation_status else None,
+                "validation_reasons": case.validation_reasons or [],
+                "fraud_signals": case.fraud_signals or [],
+                "severity_score": case.severity_score,
+                "severity_level": str(case.severity_level.value) if case.severity_level else None,
+                "time_sensitivity": str(case.time_sensitivity.value) if case.time_sensitivity else None,
+                "key_insight": case.key_insight,
+                "delay_consequence": case.delay_consequence,
+                "action_plan": case.action_plan,
+                "resource_request": case.resource_request,
+                "ticket_id": ticket_id,
+                "assigned_ngo_id": case.assigned_ngo_id,
+                "timestamp": timestamp_str,
+            }
+            await mcp_router.route("sheets", "update_or_append_case", sheets_payload)
+            logger.info(f"[DispatchAgent] Google Sheets updated successfully to rejected.")
+            sheets_ok = True
+        except Exception as exc:
+            logger.error(f"[DispatchAgent] Google Sheets update failed on rejected case: {exc}")
+            sheets_ok = False
+
         case.append_trace(TraceObject(
             agent="DispatchAgent",
             timestamp=datetime.now(timezone.utc).isoformat(),
@@ -83,8 +136,8 @@ async def run(case: CaseObject) -> CaseObject:
                 f"Case is FAILED or INVALID. "
                 f"Ticket {ticket_id} generated for tracking. No volunteer assigned."
             ),
-            tool_calls=[],
-            output_summary=f"FAILED. Ticket: {ticket_id}. No dispatch.",
+            tool_calls=["sheets_mcp:update_row"] if sheets_ok else [],
+            output_summary=f"FAILED. Ticket: {ticket_id}. No dispatch. Sheet updated.",
         ))
         await _persist_to_firebase(case, ticket_id, dispatch_log=None)
         return case
@@ -114,7 +167,7 @@ async def run(case: CaseObject) -> CaseObject:
         system_prompt=DISPATCH_AGENT_SYSTEM_PROMPT,
         user_message=volunteer_context,
         temperature=0.4,
-        model_name="gemini-2.5-flash",
+        model_name="gemini-3.1-flash-lite",
     )
 
     # ── Fallback if Gemini fails ─────────────────────────────
@@ -168,13 +221,68 @@ async def run(case: CaseObject) -> CaseObject:
         "volunteer_instruction": result.get("volunteer_instruction", ""),
     }
 
+    # ── Update Google Sheets ─────────────────────────────────
+    # Recheck target sheet classification
+    is_rejected = (
+        case.dispatch_status == DispatchStatus.FAILED
+        or case.validation_status == ValidationStatus.INVALID
+        or case.pipeline_stage == "INTAKE_FAILED"
+    )
+    if is_rejected:
+        target_sheet = "rejected"
+    elif (
+        (case.severity_level and case.severity_level.value in ["HIGH", "CRITICAL"])
+        or (case.time_sensitivity and case.time_sensitivity.value in ["IMMEDIATE", "TODAY"])
+    ):
+        target_sheet = "high_priority"
+    else:
+        target_sheet = "low_priority"
+
+    try:
+        sheets_payload = {
+            "target_sheet": target_sheet,
+            "case_id": case.case_id,
+            "applicant_name": case.applicant_name,
+            "phone": case.phone,
+            "location": case.location_normalized,
+            "crisis_type": case.crisis_type,
+            "family_size": case.family_size,
+            "income_monthly": case.income_monthly,
+            "description_original": case.description_original or "",
+            "description_en": case.description_en or "",
+            "validation_status": str(case.validation_status.value) if case.validation_status else None,
+            "validation_reasons": case.validation_reasons or [],
+            "fraud_signals": case.fraud_signals or [],
+            "severity_score": case.severity_score,
+            "severity_level": str(case.severity_level.value) if case.severity_level else None,
+            "time_sensitivity": str(case.time_sensitivity.value) if case.time_sensitivity else None,
+            "key_insight": case.key_insight,
+            "delay_consequence": case.delay_consequence,
+            "action_plan": case.action_plan,
+            "resource_request": case.resource_request,
+            "ticket_id": ticket_id,
+            "assigned_ngo_id": case.assigned_ngo_id,
+            "timestamp": dispatch_log["dispatched_at"],
+        }
+        await mcp_router.route("sheets", "update_or_append_case", sheets_payload)
+        logger.info(f"[DispatchAgent] Google Sheets updated successfully to {target_sheet}.")
+        sheets_ok = True
+    except Exception as exc:
+        logger.error(f"[DispatchAgent] Google Sheets update failed: {exc}")
+        sheets_ok = False
+
     # ── Append trace ─────────────────────────────────────────
     tool_calls = [
         "firebase_firestore:volunteers_query (via FastAPI)",
         "gemini_api:sms_generation",
+    ]
+    if sheets_ok:
+        tool_calls.append("sheets_mcp:update_row")
+    tool_calls.extend([
         "firebase_firestore:dispatch_log_insert (via FastAPI)",
         "firebase_firestore:case_update (via FastAPI)",
-    ]
+    ])
+    
     case.append_trace(TraceObject(
         agent="DispatchAgent",
         timestamp=datetime.now(timezone.utc).isoformat(),
@@ -188,7 +296,8 @@ async def run(case: CaseObject) -> CaseObject:
         tool_calls=tool_calls,
         output_summary=(
             f"{case.dispatch_status}. Volunteer: {case.volunteer_assigned}. "
-            f"Ticket: {ticket_id}. SMS drafted. Firebase logged."
+            f"Ticket: {ticket_id}. SMS drafted. Firebase logged." +
+            (" Sheet updated." if sheets_ok else "")
         ),
     ))
 
@@ -216,6 +325,7 @@ async def _persist_to_firebase(
             "dispatch_status": case.dispatch_status.value,
             "pipeline_stage": case.pipeline_stage,
             "volunteer_assigned": case.volunteer_assigned,
+            "assigned_ngo_id": case.assigned_ngo_id,
             "ticket_id": ticket_id,
             "sms_draft": case.sms_draft,
             "agent_trace": [

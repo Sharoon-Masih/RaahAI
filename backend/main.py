@@ -26,8 +26,10 @@ from backend.config import settings
 from backend.routes import firebase as firebase_router
 from backend.routes import ingestion as ingestion_router
 from backend.routes import pipeline as pipeline_router
+from backend.routes import ngos as ngos_router
 from backend.services import firebase_service
 from backend.services import gemini_service
+from backend.services import sheets_service
 from backend.services.mcp_router import mcp_router
 
 # ── Structured logging setup ────────────────────────────────
@@ -75,6 +77,7 @@ async def lifespan(app: FastAPI):
 
     # Register MCP tools in router
     mcp_router.register("firebase", firebase_service)
+    mcp_router.register("sheets", sheets_service)
     logger.info(
         "MCP tools registered.",
         tools=mcp_router.available_tools(),
@@ -139,11 +142,15 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# ── Routers ──────────────────────────────────────────────────
+from backend.routes import dashboard as dashboard_router
+from backend.routes import applications as applications_router
 
 app.include_router(ingestion_router.router, prefix=settings.API_PREFIX)
 app.include_router(firebase_router.router, prefix=settings.API_PREFIX)
 app.include_router(pipeline_router.router, prefix=settings.API_PREFIX)
+app.include_router(ngos_router.router, prefix=settings.API_PREFIX)
+app.include_router(dashboard_router.router, prefix=settings.API_PREFIX)
+app.include_router(applications_router.router, prefix=settings.API_PREFIX)
 
 
 # ── Health & Root ────────────────────────────────────────────

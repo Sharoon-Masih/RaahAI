@@ -4,11 +4,11 @@
 # ============================================================
 
 # Web Framework
-fastapi==0.115.5
-uvicorn[standard]==0.32.1
+fastapi>=0.115.5
+uvicorn[standard]>=0.32.1
 
 # Data validation (must match shared/schemas.py)
-pydantic==2.10.3
+pydantic>=2.10.3
 
 # Firebase Admin SDK (Firestore + Auth)
 firebase-admin==6.6.0
@@ -27,3 +27,6 @@ structlog==24.4.0
 
 # CORS & security
 python-multipart==0.0.12
+
+# Excel processing
+openpyxl==3.1.5

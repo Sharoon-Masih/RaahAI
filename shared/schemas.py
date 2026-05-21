@@ -69,6 +69,7 @@ class RawSubmission(BaseModel):
     income_monthly: Optional[int] = Field(default=0, ge=0)
     description: Optional[str] = Field(default="", description="Free text in any language")
     submission_source: SubmissionSource = Field(default=SubmissionSource.FLUTTER_APP)
+    assigned_ngo_id: Optional[str] = Field(default=None, description="Optional UUID of assigned NGO")
 
     @field_validator('phone')
     @classmethod
@@ -136,6 +137,7 @@ class CaseObject(BaseModel):
 
     # ── Dispatch (set by Dispatch Agent)
     volunteer_assigned: Optional[str] = None
+    assigned_ngo_id: Optional[str] = None
     ticket_id: Optional[str] = None
     sms_draft: Optional[str] = None
     dispatch_status: DispatchStatus = DispatchStatus.PENDING
@@ -193,3 +195,26 @@ class StatsResponse(BaseModel):
     dispatched: int
     failed: int
     critical: int
+
+
+# ── NGO AUTH SCHEMAS ───────────────────────────────────────────
+
+class NGORegisterRequest(BaseModel):
+    name: str = Field(..., description="NGO Full Name")
+    email: str = Field(..., description="NGO Login Email")
+    password: str = Field(..., min_length=6, description="Login password")
+    crisis_types: List[str] = Field(default_factory=list, description="Crisis types covered")
+    locations: List[str] = Field(default_factory=list, description="Pakistani cities covered")
+
+class NGOLoginRequest(BaseModel):
+    email: str = Field(..., description="NGO Login Email")
+    password: str = Field(..., description="Login password")
+
+class NGOResponse(BaseModel):
+    ngo_id: str
+    name: str
+    email: str
+    crisis_types: List[str]
+    locations: List[str]
+    created_at: str
+

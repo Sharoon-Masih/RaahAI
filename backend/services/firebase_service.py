@@ -29,6 +29,7 @@ def _resolve_service_account() -> Optional[str]:
     """Find the Firebase service account JSON file."""
     candidates = [
         settings.FIREBASE_SERVICE_ACCOUNT_PATH,
+        Path(__file__).parent.parent.parent / "firebase_cred.json",
         Path(__file__).parent.parent.parent / "firebase-adminsdk.json",
         Path(__file__).parent.parent / "firebase-adminsdk.json",
         Path(__file__).parent.parent.parent / ".secrets" / "firebase-adminsdk.json",
@@ -131,6 +132,16 @@ async def list_cases(limit: int = 100, status_filter: Optional[str] = None) -> l
     return [d.to_dict() for d in docs]
 
 
+async def list_cases_for_ngo(ngo_id: str) -> list[dict]:
+    """Fetch all cases assigned to a specific NGO for dashboard/application filtering."""
+    from google.cloud.firestore_v1.base_query import FieldFilter
+    col = _col(settings.COLLECTION_CASES)
+    # We fetch all because we'll do in-memory filtering as requested
+    query = col.where(filter=FieldFilter("assigned_ngo_id", "==", ngo_id))
+    docs = query.stream()
+    return [d.to_dict() for d in docs]
+
+
 # ── traces/ ─────────────────────────────────────────────────
 
 async def write_trace(case_id: str, trace_dict: dict) -> None:
@@ -201,3 +212,53 @@ async def get_case_stats() -> dict:
         "failed": counts["FAILED"],
         "critical": critical,
     }
+
+
+# ── ngos/ (Custom Auth & CRUD) ───────────────────────────────
+
+import hashlib
+import os
+
+def hash_password(password: str) -> str:
+    """Hash password securely using built-in hashlib PBKDF2."""
+    salt = os.urandom(16)
+    db_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+    return f"{salt.hex()}:{db_hash.hex()}"
+
+
+def verify_password(password: str, hashed_password: str) -> bool:
+    """Verify password against hashed password."""
+    try:
+        salt_hex, hash_hex = hashed_password.split(':')
+        salt = bytes.fromhex(salt_hex)
+        db_hash = bytes.fromhex(hash_hex)
+        new_hash = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+        return new_hash == db_hash
+    except Exception:
+        return False
+
+
+async def write_ngo(ngo_id: str, ngo_data: dict) -> None:
+    """Write or update an NGO profile in firestore."""
+    _col(settings.COLLECTION_NGOS).document(ngo_id).set(ngo_data)
+    logger.info(f"[Firebase] ngos/{ngo_id} written.")
+
+
+async def get_ngo_by_email(email: str) -> Optional[dict]:
+    """Retrieve an NGO profile from Firestore by email (case-insensitive)."""
+    docs = (
+        _col(settings.COLLECTION_NGOS)
+        .where("email", "==", email.lower())
+        .limit(1)
+        .stream()
+    )
+    for d in docs:
+        return d.to_dict()
+    return None
+
+
+async def get_ngo_by_id(ngo_id: str) -> Optional[dict]:
+    """Retrieve an NGO profile from Firestore by ID."""
+    doc = _col(settings.COLLECTION_NGOS).document(ngo_id).get()
+    return doc.to_dict() if doc.exists else None
+

@@ -27,13 +27,18 @@ from shared.schemas import CaseObject, DispatchStatus, TraceObject
 logger = logging.getLogger(__name__)
 
 
-async def run_pipeline(raw_input: str, submission_source: str = "web_form") -> CaseObject:
+async def run_pipeline(
+    raw_input: str,
+    submission_source: str = "web_form",
+    assigned_ngo_id: Optional[str] = None,
+) -> CaseObject:
     """
     Run the full 5-agent pipeline on a raw text input.
 
     Args:
         raw_input: Unstructured text from any source.
         submission_source: "flutter_app" | "web_form" | "staff_entry"
+        assigned_ngo_id: Optional UUID of the assigned NGO partner.
 
     Returns:
         Fully processed CaseObject.
@@ -45,6 +50,9 @@ async def run_pipeline(raw_input: str, submission_source: str = "web_form") -> C
         stage_name="IntakeAgent",
         coro=_run_intake(raw_input, submission_source),
     )
+    if assigned_ngo_id:
+        case.assigned_ngo_id = assigned_ngo_id
+        logger.info(f"[Pipeline] Case assigned to NGO partner: {assigned_ngo_id}")
     await asyncio.sleep(3)
 
     # ── Stage 2: Validation Agent ────────────────────────────
