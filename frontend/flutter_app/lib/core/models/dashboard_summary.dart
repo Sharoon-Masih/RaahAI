@@ -29,7 +29,7 @@ class DashboardSummary {
       volunteerMetrics: VolunteerMetrics.fromJson(json['volunteer_metrics'] ?? {}),
       performanceMetrics: PerformanceMetrics.fromJson(json['performance_metrics'] ?? {}),
       timeMetrics: TimeMetrics.fromJson(json['time_metrics'] ?? {}),
-      emergencyTrends: parseTrends(json['emergency_trends']),
+      emergencyTrends: parseTrends(json['emergency_trends'] ?? json['crisis_type_counts']),
     );
   }
 

@@ -375,12 +375,6 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
       decoration: BoxDecoration(
         color: AppColors.surfaceElevated,
         borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(color: severityColor, width: 4),
-          top: const BorderSide(color: AppColors.border, width: 1),
-          right: const BorderSide(color: AppColors.border, width: 1),
-          bottom: const BorderSide(color: AppColors.border, width: 1),
-        ),
       ),
       child: InkWell(
         onTap: () {
@@ -391,106 +385,121 @@ class _ApplicationsScreenState extends State<ApplicationsScreen> {
           );
         },
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Ticket ID + Time
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    caseItem.ticketId ?? 'TICKET-PENDING',
-                    style: AppTextStyles.monospace(color: AppColors.secondary, fontSize: 12),
-                  ),
-                  Text(
-                    '10 mins ago', // Simple formatting fallback or custom parser
-                    style: AppTextStyles.bodySmall(color: AppColors.textMuted),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
+        child: Row(
 
-              // Name + Location
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
+          children: [
+            Container(
+              width: 4,
+              height: 120,
+              decoration: BoxDecoration(
+                color: severityColor,
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(12), bottomLeft: Radius.circular(12)),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Ticket ID + Time
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          caseItem.ticketId ?? 'TICKET-PENDING',
+                          style: AppTextStyles.monospace(color: AppColors.secondary, fontSize: 12),
+                        ),
+                        Text(
+                          '10 mins ago',
+                          style: AppTextStyles.bodySmall(color: AppColors.textMuted),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Name + Location
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          caseItem.applicantName ?? 'Anonymous Applicant',
-                          style: AppTextStyles.heading4(color: AppColors.textPrimary),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                caseItem.applicantName ?? 'Anonymous Applicant',
+                                style: AppTextStyles.heading4(color: AppColors.textPrimary),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textMuted),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    caseItem.locationNormalized ?? 'Pakistan',
+                                    style: AppTextStyles.bodySmall(color: AppColors.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textMuted),
-                            const SizedBox(width: 4),
-                            Text(
-                              caseItem.locationNormalized ?? 'Pakistan',
-                              style: AppTextStyles.bodySmall(color: AppColors.textMuted),
-                            ),
-                          ],
+                        CircleAvatar(
+                          backgroundColor: crisisColor.withValues(alpha: 0.12),
+                          child: Icon(
+                            StatusHelpers.getCrisisTypeIcon(caseItem.crisisType),
+                            color: crisisColor,
+                            size: 20,
+                          ),
                         ),
                       ],
                     ),
-                  ),
-                  CircleAvatar(
-                    backgroundColor: crisisColor.withValues(alpha: 0.12),
-                    child: Icon(
-                      StatusHelpers.getCrisisTypeIcon(caseItem.crisisType),
-                      color: crisisColor,
-                      size: 20,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
-              // Badges row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Severity Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: severityColor.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: severityColor.withValues(alpha: 0.3)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    // Badges row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(StatusHelpers.getSeverityIcon(caseItem.severityLevel), color: severityColor, size: 12),
-                        const SizedBox(width: 4),
-                        Text(
-                          caseItem.severityLevel ?? 'LOW',
-                          style: AppTextStyles.labelSmall(color: severityColor),
+                        // Severity Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: severityColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: severityColor.withValues(alpha: 0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(StatusHelpers.getSeverityIcon(caseItem.severityLevel), color: severityColor, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                caseItem.severityLevel ?? 'LOW',
+                                style: AppTextStyles.labelSmall(color: severityColor),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Status Badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            (caseItem.dispatchStatus ?? 'PENDING').toUpperCase(),
+                            style: AppTextStyles.labelSmall(color: statusColor).copyWith(fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ],
                     ),
-                  ),
-
-                  // Status Badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      caseItem.dispatchStatus.toUpperCase(),
-                      style: AppTextStyles.labelSmall(color: statusColor).copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

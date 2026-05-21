@@ -83,13 +83,8 @@ def _enforce_intake_contract(data: dict, raw_input: str, submission_source: str)
     Enforce the Intake Agent output contract on the Gemini result.
     Sets mandatory fields, nullifies downstream fields, preserves original input.
     """
-    # Generate fresh case_id if missing or invalid
-    case_id = data.get("case_id", "")
-    try:
-        uuid.UUID(str(case_id))
-    except (ValueError, AttributeError):
-        case_id = str(uuid.uuid4())
-    data["case_id"] = case_id
+    # Always generate a fresh UUID for a new intake case to prevent duplicate ID leaks from LLM examples
+    data["case_id"] = str(uuid.uuid4())
 
     # Pipeline stage from Gemini or default
     if data.get("pipeline_stage") not in ("INTAKE_COMPLETE", "INTAKE_FAILED"):
