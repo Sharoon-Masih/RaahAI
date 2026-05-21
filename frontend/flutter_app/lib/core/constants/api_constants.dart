@@ -4,7 +4,7 @@ class ApiConstants {
   // Base URL for the FastAPI backend.
   // Use http://10.0.2.2:8000/api/v1 for Android emulator.
   // Use http://localhost:8000/api/v1 for iOS simulator, web, or physical devices on the same network.
-  static const String baseUrl = 'http://10.0.2.2:8000/api/v1';
+  static const String baseUrl = 'http://localhost:8000/api/v1';
 
   // Endpoint Paths (appended to baseUrl)
   static const String register = '/ngos/register';
