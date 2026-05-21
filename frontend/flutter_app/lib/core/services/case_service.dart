@@ -102,7 +102,7 @@ class CaseService {
         'case_id': caseId,
         'dispatch_status': dispatchStatus,
         'pipeline_stage': pipelineStage,
-        'extra_fields': ?extraFields,
+        'extra_fields': extraFields,
       },
     );
     return jsonDecode(response.body);
