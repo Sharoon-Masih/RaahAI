@@ -1,7 +1,9 @@
 // lib/features/submit/submit_screen.dart
 
 import 'dart:async';
-import 'dart:math';
+import 'dart:io' as io;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
@@ -27,6 +29,13 @@ class _SubmitScreenState extends State<SubmitScreen> with SingleTickerProviderSt
   int _currentSimulationStep = 0;
   CaseObject? _simulationResult;
 
+  // Pipeline flow timer and error handling states
+  Timer? _pipelineTimer;
+  int _pipelineElapsedSeconds = 0;
+  String? _rawFlowError;
+  String? _rawFlowWarning;
+  bool _rawFlowTimeout = false;
+
   // Spreadsheet state
   bool _isUploadingSpreadsheet = false;
   String? _spreadsheetName;
@@ -35,6 +44,7 @@ class _SubmitScreenState extends State<SubmitScreen> with SingleTickerProviderSt
   int _flaggedRows = 0;
   int _failedRows = 0;
   List<String> _spreadsheetLogs = [];
+
 
   final List<String> _steps = [
     'Intake Agent: Extracting case text & normalizing demographics...',
@@ -54,60 +64,113 @@ class _SubmitScreenState extends State<SubmitScreen> with SingleTickerProviderSt
   void dispose() {
     _tabController.dispose();
     _textController.dispose();
+    _pipelineTimer?.cancel();
     super.dispose();
   }
 
   void _startPipelineSimulation(String rawText) async {
+    _pipelineTimer?.cancel();
+    
     setState(() {
       _isSimulatingPipeline = true;
-      _currentSimulationStep = 0;
+      _currentSimulationStep = 1;
       _simulationResult = null;
+      _rawFlowError = null;
+      _rawFlowWarning = null;
+      _rawFlowTimeout = false;
+      _pipelineElapsedSeconds = 0;
     });
 
-    // Step-by-step simulator timing (800ms per agent)
-    for (int i = 0; i < _steps.length; i++) {
-      await Future.delayed(const Duration(milliseconds: 1000));
+    // Timed stage progression:
+    // 0–4s: Stage 1 active
+    // 4–8s: Stage 2 active
+    // 8–13s: Stage 3 active
+    // 13–18s: Stage 4 active
+    // 18s+: Stage 5 active
+    _pipelineTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _pipelineElapsedSeconds++;
+        if (_pipelineElapsedSeconds < 4) {
+          _currentSimulationStep = 1;
+        } else if (_pipelineElapsedSeconds < 8) {
+          _currentSimulationStep = 2;
+        } else if (_pipelineElapsedSeconds < 13) {
+          _currentSimulationStep = 3;
+        } else if (_pipelineElapsedSeconds < 18) {
+          _currentSimulationStep = 4;
+        } else {
+          _currentSimulationStep = 5;
+        }
+      });
+    });
+
+    // Fire off the concurrent backend request
+    try {
+      final casesProvider = Provider.of<CasesProvider>(context, listen: false);
+      final result = await casesProvider.submitRawCase(rawText).timeout(
+        const Duration(seconds: 45),
+        onTimeout: () {
+          _pipelineTimer?.cancel();
+          if (mounted) {
+            setState(() {
+              _rawFlowTimeout = true;
+              _rawFlowError = "Pipeline is taking longer than expected. Your case has been saved. Check Applications tab.";
+            });
+          }
+          throw TimeoutException('Triage timed out');
+        },
+      );
+
+      _pipelineTimer?.cancel();
+
       if (!mounted) return;
-      setState(() {
-        _currentSimulationStep = i + 1;
-      });
-    }
 
-    // Call actual backend submitting service through CasesProvider
-    final casesProvider = Provider.of<CasesProvider>(context, listen: false);
-    final result = await casesProvider.submitRawCase(rawText);
+      if (result == null) {
+        setState(() {
+          _rawFlowError = casesProvider.errorMessage ?? "System error. Please try again in a few seconds.";
+        });
+        return;
+      }
 
-    if (mounted) {
+      // Check validation and dispatch conditions
+      if (result.validationStatus == 'INVALID') {
+        final reason = result.validationReasons.isNotEmpty ? result.validationReasons[0] : 'Unknown';
+        setState(() {
+          _rawFlowError = "This submission was flagged as invalid. Reason: $reason";
+        });
+      } else if (result.validationStatus == 'NEED_MORE_INFO') {
+        setState(() {
+          _rawFlowWarning = "Submitted but more info may be needed. Case will be reviewed.";
+          _simulationResult = result;
+        });
+      } else if (result.dispatchStatus == 'FAILED') {
+        setState(() {
+          _rawFlowWarning = "Application received but needs manual review. Ticket: ${result.ticketId}";
+          _simulationResult = result;
+        });
+      } else {
+        setState(() {
+          _simulationResult = result;
+        });
+      }
+
+    } catch (e) {
+      _pipelineTimer?.cancel();
+      if (!mounted) return;
+      if (e is TimeoutException) return;
+      
       setState(() {
-        _simulationResult = result ?? _buildMockCase(rawText);
+        _rawFlowError = "System error. Please try again in a few seconds.";
       });
     }
   }
 
-  // Fallback synthetic case mock if API fails
-  CaseObject _buildMockCase(String rawText) {
-    final ticketNum = Random().nextInt(90000) + 10000;
-    return CaseObject(
-      caseId: 'mock-${DateTime.now().millisecondsSinceEpoch}',
-      applicantName: 'Muhammad Ali',
-      phone: '+923007654321',
-      locationNormalized: 'Orangi Town, Karachi',
-      crisisType: 'food',
-      familySize: 6,
-      incomeMonthly: 12000,
-      hasChildren: true,
-      medicalEmergency: false,
-      severityScore: 8.2,
-      severityLevel: 'HIGH',
-      ticketId: 'TKT-$ticketNum',
-      timeSensitivity: 'TODAY',
-      actionPlan: 'Dispatch immediate family food ration pack (30 days supply).',
-      resourceRequest: '1x Standard Food Ration Pack, Wheat Flour 10kg.',
-      smsDraft: 'RaahAI: Muhammad Ali, aid request TKT-$ticketNum is approved. Zainab Bibi (+923001234567) is dispatched.',
-      dispatchStatus: 'PENDING',
-      pipelineStage: 'dispatch',
-    );
-  }
+
+
 
   void _pickSpreadsheet() async {
     final result = await FilePicker.platform.pickFiles(
@@ -115,46 +178,101 @@ class _SubmitScreenState extends State<SubmitScreen> with SingleTickerProviderSt
       allowedExtensions: ['csv', 'xlsx'],
     );
 
-    if (result != null && result.files.single.path != null) {
+    if (result != null) {
       final file = result.files.single;
+      
+      Uint8List bytes;
+      if (kIsWeb) {
+        if (file.bytes != null) {
+          bytes = file.bytes!;
+        } else {
+          return;
+        }
+      } else {
+        if (file.bytes != null) {
+          bytes = file.bytes!;
+        } else if (file.path != null) {
+          bytes = io.File(file.path!).readAsBytesSync();
+        } else {
+          return;
+        }
+      }
+
+      if (bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Selected spreadsheet is empty.')),
+          );
+        }
+        return;
+      }
+
+      if (!mounted) return;
+
       setState(() {
         _spreadsheetName = file.name;
         _isUploadingSpreadsheet = true;
-        _totalRows = Random().nextInt(40) + 20; // Simulated rows
+        _totalRows = 0;
         _processedRows = 0;
         _flaggedRows = 0;
         _failedRows = 0;
         _spreadsheetLogs = [];
       });
 
-      // Stream-row simulation
-      for (int i = 1; i <= _totalRows; i++) {
-        await Future.delayed(const Duration(milliseconds: 150));
-        if (!mounted) return;
+      try {
+        final casesProvider = Provider.of<CasesProvider>(context, listen: false);
+        final progressStream = casesProvider.submitSpreadsheet(
+          fileBytes: bytes,
+          filename: file.name,
+        );
 
-        final rand = Random().nextDouble();
-        String logStatus;
-        if (rand > 0.85) {
-          _failedRows++;
-          logStatus = 'FAILED: Invalid Phone/Duplicate ID';
-        } else if (rand > 0.65) {
-          _flaggedRows++;
-          logStatus = 'FLAGGED: Missing CNIC (Verification Needed)';
-        } else {
-          _processedRows++;
-          logStatus = 'DISPATCHED: Standard Aid Route';
+        await for (final event in progressStream) {
+          if (!mounted) return;
+
+          final status = event['status'];
+          final rowNum = event['row'] ?? 0;
+          final total = event['total'] ?? 0;
+
+          setState(() {
+            _totalRows = total;
+            String logStatus;
+
+            if (status == 'success') {
+              final valStatus = event['validation_status'];
+              final caseId = event['case_id'] ?? '';
+
+              if (valStatus == 'NEED_MORE_INFO') {
+                _flaggedRows++;
+                logStatus = 'FLAGGED: Case $caseId (Need More Info)';
+              } else {
+                _processedRows++;
+                logStatus = 'DISPATCHED: Case $caseId ($valStatus)';
+              }
+            } else {
+              _failedRows++;
+              final error = event['error'] ?? 'Pipeline execution failed';
+              logStatus = 'FAILED: Row $rowNum — $error';
+            }
+
+            _spreadsheetLogs.insert(0, 'Row $rowNum/$total: $logStatus');
+          });
         }
-
-        setState(() {
-          _spreadsheetLogs.insert(0, 'Row $i: $logStatus');
-        });
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _spreadsheetLogs.insert(0, 'STREAM ERROR: ${e.toString()}');
+          });
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isUploadingSpreadsheet = false;
+          });
+        }
       }
-
-      setState(() {
-        _isUploadingSpreadsheet = false;
-      });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -265,13 +383,88 @@ class _SubmitScreenState extends State<SubmitScreen> with SingleTickerProviderSt
   Widget _buildPipelineSimulationUI() {
     final result = _simulationResult;
 
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (result == null) ...[
+    if (_rawFlowError != null || _rawFlowTimeout) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                _rawFlowTimeout ? Icons.timer_outlined : Icons.error_outline_outlined,
+                color: AppColors.critical,
+                size: 64,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _rawFlowTimeout ? 'Triage Request Timeout' : 'Pipeline Request Failed',
+                style: AppTextStyles.heading2(color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.critical.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _rawFlowError ?? "System error. Please try again in a few seconds.",
+                      style: AppTextStyles.bodyMedium(color: AppColors.textPrimary),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _isSimulatingPipeline = false;
+                          _rawFlowError = null;
+                          _rawFlowTimeout = false;
+                        });
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text('Go Back', style: TextStyle(color: AppColors.textPrimary)),
+                    ),
+                  ),
+                  if (_rawFlowTimeout) ...[
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          _startPipelineSimulation(_textController.text);
+                        },
+                        child: const Text('Retry Submission'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (result == null) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -288,6 +481,12 @@ class _SubmitScreenState extends State<SubmitScreen> with SingleTickerProviderSt
                 'AI Multi-Agent Dispatch Sequencing',
                 style: AppTextStyles.heading3(color: AppColors.textPrimary),
               ),
+              const SizedBox(height: 6),
+              Text(
+                'Processing application through AI pipeline...\nThis takes 15–30 seconds. Please wait.',
+                style: AppTextStyles.bodySmall(color: AppColors.textMuted),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
@@ -298,8 +497,9 @@ class _SubmitScreenState extends State<SubmitScreen> with SingleTickerProviderSt
                 ),
                 child: Column(
                   children: List.generate(_steps.length, (index) {
-                    final isDone = index < _currentSimulationStep;
-                    final isCurrent = index == _currentSimulationStep;
+                    final stepNum = index + 1;
+                    final isDone = stepNum < _currentSimulationStep;
+                    final isCurrent = stepNum == _currentSimulationStep;
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                       child: Row(
@@ -322,6 +522,7 @@ class _SubmitScreenState extends State<SubmitScreen> with SingleTickerProviderSt
                                     ? AppColors.textPrimary 
                                     : (isCurrent ? AppColors.secondary : AppColors.textMuted),
                                 fontSize: 13,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
                           ),
@@ -331,107 +532,194 @@ class _SubmitScreenState extends State<SubmitScreen> with SingleTickerProviderSt
                   }),
                 ),
               ),
-            ] else ...[
-              // Simulation Output Results
-              Icon(Icons.verified_outlined, color: AppColors.primaryAccent, size: 64),
-              const SizedBox(height: 12),
-              Text(
-                'Dispatch Executed Successfully!',
-                style: AppTextStyles.heading2(color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      );
+    }
 
-              // Final ticket summary card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceElevated,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
+    final showWarning = _rawFlowWarning != null;
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              showWarning ? Icons.warning_amber_rounded : Icons.verified_outlined,
+              color: showWarning ? AppColors.warning : AppColors.primaryAccent,
+              size: 64,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              showWarning ? 'Manual Review Required' : 'Dispatch Executed Successfully!',
+              style: AppTextStyles.heading2(color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 16),
+
+            // Final ticket summary card
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: showWarning ? AppColors.warning.withValues(alpha: 0.3) : AppColors.border,
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          result.ticketId ?? 'TKT-PENDING',
-                          style: AppTextStyles.monospace(color: AppColors.secondary),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        result.ticketId ?? 'TKT-PENDING',
+                        style: AppTextStyles.monospace(color: AppColors.secondary),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.statusColor(result.dispatchStatus).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.statusColor(result.dispatchStatus).withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            result.dispatchStatus.toUpperCase(),
-                            style: AppTextStyles.labelSmall(color: AppColors.statusColor(result.dispatchStatus)),
-                          ),
+                        child: Text(
+                          result.dispatchStatus.toUpperCase(),
+                          style: AppTextStyles.labelSmall(color: AppColors.statusColor(result.dispatchStatus)),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
+                  if (showWarning) ...[
                     const SizedBox(height: 12),
-                    Text(
-                      result.applicantName ?? 'Muhammad Ali',
-                      style: AppTextStyles.heading3(color: AppColors.textPrimary),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.2)),
+                      ),
+                      child: Text(
+                        _rawFlowWarning!,
+                        style: AppTextStyles.bodySmall(color: AppColors.warning),
+                      ),
                     ),
-                    Text(
-                      result.locationNormalized ?? 'Karachi',
-                      style: AppTextStyles.bodyMedium(color: AppColors.textMuted),
-                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Text(
+                    result.applicantName ?? 'Muhammad Ali',
+                    style: AppTextStyles.heading3(color: AppColors.textPrimary),
+                  ),
+                  Text(
+                    result.locationNormalized ?? 'Karachi',
+                    style: AppTextStyles.bodyMedium(color: AppColors.textMuted),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(color: AppColors.border),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _buildSummaryKPI(
+                        'Severity Score',
+                        result.severityScore != null ? '${result.severityScore}/10.0' : 'N/A',
+                        AppColors.severityColor(result.severityLevel),
+                      ),
+                      _buildSummaryKPI(
+                        'Urgency Shift',
+                        result.severityLevel ?? 'LOW',
+                        AppColors.severityColor(result.severityLevel),
+                      ),
+                    ],
+                  ),
+                  if (result.volunteerAssigned != null && result.volunteerAssigned!.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     const Divider(color: AppColors.border),
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        _buildSummaryKPI('Severity Score', '${result.severityScore}/10.0', AppColors.severityColor(result.severityLevel)),
-                        _buildSummaryKPI('Urgency Shift', result.severityLevel ?? 'HIGH', AppColors.severityColor(result.severityLevel)),
+                        const Icon(Icons.person_outline, size: 16, color: AppColors.primaryAccent),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Volunteer Assigned: ',
+                          style: AppTextStyles.bodySmall(color: AppColors.textMuted),
+                        ),
+                        Text(
+                          result.volunteerAssigned!,
+                          style: AppTextStyles.bodyMedium(color: AppColors.textPrimary).copyWith(fontWeight: FontWeight.bold),
+                        ),
                       ],
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          _isSimulatingPipeline = false;
-                          _textController.clear();
-                        });
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.border),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                  if (result.smsDraft != null && result.smsDraft!.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Divider(color: AppColors.border),
+                    const SizedBox(height: 12),
+                    Text(
+                      'SMS Sent to Applicant:',
+                      style: AppTextStyles.bodySmall(color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text('Submit Another', style: TextStyle(color: AppColors.textPrimary)),
+                      child: Text(
+                        result.smsDraft!,
+                        style: AppTextStyles.monospace(color: AppColors.textPrimary, fontSize: 11),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() => _isSimulatingPipeline = false);
-                        // Redirect to main list
-                        Provider.of<CasesProvider>(context, listen: false).fetchCases(refresh: true);
-                      },
-                      child: const Text('View Cases Feed'),
-                    ),
-                  ),
+                  ],
                 ],
               ),
-            ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      setState(() {
+                        _isSimulatingPipeline = false;
+                        _textController.clear();
+                        _rawFlowWarning = null;
+                        _rawFlowError = null;
+                      });
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.border),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: Text('Submit Another', style: TextStyle(color: AppColors.textPrimary)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _isSimulatingPipeline = false;
+                        _rawFlowWarning = null;
+                        _rawFlowError = null;
+                      });
+                      Provider.of<CasesProvider>(context, listen: false).fetchCases(refresh: true);
+                    },
+                    child: const Text('View Cases Feed'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
+
 
   Widget _buildSummaryKPI(String label, String val, Color color) {
     return Expanded(

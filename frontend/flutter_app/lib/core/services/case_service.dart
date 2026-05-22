@@ -79,6 +79,44 @@ class CaseService {
     return jsonDecode(response.body);
   }
 
+  // Submit spreadsheet and stream row-by-row progress
+  Stream<Map<String, dynamic>> submitSpreadsheet({
+    required List<int> fileBytes,
+    required String filename,
+  }) async* {
+    final streamedResponse = await _apiService.sendMultipart(
+      ApiConstants.submitSpreadsheet,
+      fileBytes: fileBytes,
+      fileName: filename,
+    );
+
+    if (streamedResponse.statusCode != 200) {
+      final body = await streamedResponse.stream.bytesToString();
+      String errorMessage = 'Upload failed with status ${streamedResponse.statusCode}';
+      try {
+        final errorJson = jsonDecode(body);
+        if (errorJson is Map && errorJson.containsKey('detail')) {
+          errorMessage = errorJson['detail'].toString();
+        }
+      } catch (_) {}
+      throw Exception(errorMessage);
+    }
+
+    final stream = streamedResponse.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    await for (final line in stream) {
+      if (line.trim().isEmpty) continue;
+      try {
+        yield jsonDecode(line) as Map<String, dynamic>;
+      } catch (_) {
+        // skip malformed lines
+      }
+    }
+  }
+
+
   // Get available volunteers
   Future<List<VolunteerModel>> getAvailableVolunteers() async {
     final response = await _apiService.get(

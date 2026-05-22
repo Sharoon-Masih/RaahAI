@@ -201,6 +201,15 @@ class CasesProvider extends ChangeNotifier {
     }
   }
 
+  // Submit spreadsheet and stream raw events to UI
+  Stream<Map<String, dynamic>> submitSpreadsheet({
+    required List<int> fileBytes,
+    required String filename,
+  }) {
+    return _caseService.submitSpreadsheet(fileBytes: fileBytes, filename: filename);
+  }
+
+
   // Update case status (re-dispatch or transition status)
   Future<bool> updateCaseStatus(String caseId, String dispatchStatus, String pipelineStage, {Map<String, dynamic>? extra}) async {
     _isActionLoading = true;

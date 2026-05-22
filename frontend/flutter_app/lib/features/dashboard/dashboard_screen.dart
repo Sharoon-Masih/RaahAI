@@ -719,20 +719,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Text(text, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11));
   }
 
-  TableRow _mockCaseRow(String name, String crisis, double score, String status, String loc, Color statusColor) {
-    return TableRow(
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFF2A2D35), width: 1))
-      ),
-      children: [
-        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(name, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
-        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(crisis, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
-        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(score.toString(), style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12))),
-        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(status, style: TextStyle(color: statusColor, fontSize: 12))),
-        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(loc, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
-      ]
-    );
-  }
+
 
   Widget _buildVolunteerAvailability(DashboardSummary summary) {
     final vols = summary.volunteerAvailabilityList;

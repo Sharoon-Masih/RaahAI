@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>RaahAI — Darkhwast Karen</title>
+  
+  <!-- Google Fonts CDN -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Noto+Nastaliq+Urdu:wght@400..700&display=swap" rel="stylesheet">
+  
+  <style>
+    /* CSS Variables matching design guidelines */
+    :root {
+      --bg-primary: #f5f0e8;
+      --card-bg: #ffffff;
+      --text-primary: #1a1410;
+      --text-muted: #6b6058;
+      --color-accent: #1a6b5a; /* Deep Teal */
+      --color-success: #1a6b5a; /* Deep Teal */
+      --color-warning: #e67e22; /* Amber */
+      --color-error: #c0392b; /* Red */
+      --border-color: #dfd8cf;
+      --border-focus: #1a6b5a;
+      
+      --font-english: 'DM Sans', sans-serif;
+      --font-urdu: 'Noto Nastaliq Urdu', 'Segoe UI', Tahoma, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-english);
+      line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 24px 16px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 550px;
+      margin-top: 16px;
+    }
+
+    /* Card styling */
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(26, 20, 16, 0.04);
+      padding: 32px 24px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @media (max-width: 480px) {
+      body {
+        padding: 12px 8px;
+      }
+      .card {
+        padding: 24px 16px;
+        border-radius: 16px;
+      }
+    }
+
+    /* Logo & Header */
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .logo-container {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(26, 107, 90, 0.08);
+      color: var(--color-accent);
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      margin-bottom: 16px;
+    }
+
+    .logo-icon {
+      font-size: 32px;
+      font-weight: bold;
+    }
+
+    .brand-name {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .brand-tagline {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Bilingual Headings */
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-align: center;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .urdu-text {
+      direction: rtl;
+      font-family: var(--font-urdu);
+      font-size: 22px;
+      line-height: 2.2;
+      text-align: center;
+    }
+
+    .urdu-right {
+      direction: rtl;
+      font-family: var(--font-urdu);
+      text-align: right;
+      line-height: 2.0;
+    }
+
+    /* Input Fields */
+    .input-group {
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .textarea-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 10px;
+    }
+
+    .textarea-label span {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    textarea {
+      width: 100%;
+      height: 180px;
+      padding: 16px;
+      background-color: #faf8f5;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      font-family: var(--font-english);
+      font-size: 15px;
+      color: var(--text-primary);
+      resize: none;
+      outline: none;
+      transition: all 0.2s ease;
+      line-height: 1.5;
+    }
+
+    textarea:focus {
+      border-color: var(--border-focus);
+      background-color: #ffffff;
+      box-shadow: 0 0 0 4px rgba(26, 107, 90, 0.1);
+    }
+
+    /* Character Counter */
+    .counter-container {
+      display: flex;
+      justify-content: flex-end;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      font-weight: 500;
+    }
+
+    /* Tips List */
+    .tips-card {
+      background-color: #fdfcfb;
+      border: 1px solid #efeae0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 28px;
+    }
+
+    .tips-header {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-accent);
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .tips-list {
+      list-style-type: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .tip-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .tip-dot {
+      background-color: var(--color-accent);
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      margin-top: 8px;
+      flex-shrink: 0;
+    }
+
+    .tip-text-en {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+      width: 100%;
+    }
+
+    .tip-text-ur {
+      font-size: 14px;
+      color: var(--text-muted);
+      font-family: var(--font-urdu);
+      direction: rtl;
+      text-align: right;
+      line-height: 1.8;
+      width: 100%;
+    }
+
+    /* Action Buttons */
+    .btn {
+      width: 100%;
+      background-color: var(--color-accent);
+      color: #ffffff;
+      border: none;
+      border-radius: 12px;
+      padding: 16px 24px;
+      font-family: var(--font-english);
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background-color: #125143;
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn:disabled {
+      background-color: var(--border-color);
+      color: var(--text-muted);
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Full-Screen Loading Overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(245, 240, 232, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
+
+    .loading-content {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 480px;
+      padding: 32px 24px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+      text-align: center;
+    }
+
+    .spinner {
+      border: 4px solid rgba(26, 107, 90, 0.1);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border-left-color: var(--color-accent);
+      animation: spin 1s linear infinite;
+      margin: 0 auto 24px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .pipeline-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .pipeline-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: left;
+      margin-bottom: 24px;
+    }
+
+    .pipeline-step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 0;
+    }
+
+    .step-indicator {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      flex-shrink: 0;
+      transition: all 0.3s ease;
+    }
+
+    .step-text {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+      transition: all 0.3s ease;
+    }
+
+    /* Active Step */
+    .pipeline-step.active .step-indicator {
+      border-color: var(--color-accent);
+      background-color: var(--color-accent);
+      animation: pulse-step 1.5s infinite alternate;
+    }
+
+    @keyframes pulse-step {
+      0% { box-shadow: 0 0 0 0px rgba(26, 107, 90, 0.4); }
+      100% { box-shadow: 0 0 0 6px rgba(26, 107, 90, 0.1); }
+    }
+
+    .pipeline-step.active .step-text {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    /* Completed Step */
+    .pipeline-step.completed .step-indicator {
+      border-color: var(--color-accent);
+      background-color: var(--color-accent);
+    }
+    
+    .pipeline-step.completed .step-indicator::after {
+      content: "✓";
+      color: white;
+      font-weight: bold;
+    }
+
+    .pipeline-step.completed .step-text {
+      color: var(--color-accent);
+      font-weight: 600;
+    }
+
+    /* Pending Step */
+    .pipeline-step.pending .step-indicator::after {
+      content: "";
+      background-color: transparent;
+    }
+
+    .wait-notice {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    /* Success / Warning / Error States */
+    .state-card {
+      display: none;
+      text-align: center;
+    }
+
+    .status-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      display: inline-block;
+    }
+
+    .status-icon.success { color: var(--color-success); }
+    .status-icon.warning { color: var(--color-warning); }
+    .status-icon.error { color: var(--color-error); }
+
+    .ticket-box {
+      background-color: #faf8f5;
+      border: 1px dashed var(--border-color);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 24px 0;
+      font-family: monospace;
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      color: var(--text-primary);
+    }
+
+    .alert-box {
+      border-radius: 12px;
+      padding: 16px;
+      margin: 20px 0;
+      text-align: left;
+    }
+
+    .alert-box.warning {
+      background-color: rgba(230, 126, 34, 0.08);
+      border: 1px solid rgba(230, 126, 34, 0.2);
+      color: #935116;
+    }
+
+    .alert-box.error {
+      background-color: rgba(192, 57, 43, 0.08);
+      border: 1px solid rgba(192, 57, 43, 0.2);
+      color: #7b241c;
+    }
+
+    .alert-heading {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .alert-message {
+      font-size: 13.5px;
+      line-height: 1.5;
+    }
+
+    /* Subtexts for Success Screen */
+    .success-instruction {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .nav-buttons {
+      margin-top: 32px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="card">
+      
+      <!-- STATE 1: Form (Default View) -->
+      <div id="form-state">
+        <!-- Logo & Brand Header -->
+        <div class="header">
+          <div class="logo-container">
+            <span class="logo-icon">ر</span>
+          </div>
+          <h1 class="brand-name">RaahAI</h1>
+          <p class="brand-tagline">Autonomous NGO Case Intelligence & Dispatch</p>
+        </div>
+
+        <div class="section-title">
+          <div class="urdu-text">اپنا مسئلہ بتائیں</div>
+          <div style="font-size: 14px; color: var(--text-muted); font-weight: 500;">Tell us your situation</div>
+        </div>
+
+        <!-- Textarea Input Form -->
+        <div class="input-group">
+          <div class="textarea-label">
+            <span>Problem Description / تفصیلات</span>
+            <span style="color: var(--color-accent); font-weight: bold;">Roman Urdu / Urdu / English</span>
+          </div>
+          
+          <textarea id="msg-input" 
+                    maxlength="2000" 
+                    placeholder="Apna naam, location, masla, aur family ka haal likhen...&#10;اپنا نام، پتا، مسئلہ اور خاندان کا حال لکھیں..." 
+                    oninput="handleInput()"></textarea>
+          
+          <div class="counter-container">
+            <span id="char-counter">0</span> / 2000
+          </div>
+        </div>
+
+        <!-- Bilingual Assistance Tips -->
+        <div class="tips-card">
+          <div class="tips-header">
+            <span>Helpful Information to Include:</span>
+            <span class="urdu-right" style="font-size: 14px; line-height: 1.0;">یہ باتیں ضرور لکھیں:</span>
+          </div>
+          <ul class="tips-list">
+            <li class="tip-item">
+              <div class="tip-dot"></div>
+              <div style="display: flex; flex-direction: column; width: 100%;">
+                <span class="tip-text-en">Your name and contact phone number</span>
+                <span class="tip-text-ur">اپنا نام اور فون نمبر</span>
+              </div>
+            </li>
+            <li class="tip-item">
+              <div class="tip-dot"></div>
+              <div style="display: flex; flex-direction: column; width: 100%;">
+                <span class="tip-text-en">Where you live (City, specific colony or street)</span>
+                <span class="tip-text-ur">آپ کہاں رہتے ہیں (شہر، علاقہ اور گلی نمبر)</span>
+              </div>
+            </li>
+            <li class="tip-item">
+              <div class="tip-dot"></div>
+              <div style="display: flex; flex-direction: column; width: 100%;">
+                <span class="tip-text-en">How many family members live with you</span>
+                <span class="tip-text-ur">گھر میں کتنے لوگ ہیں</span>
+              </div>
+            </li>
+            <li class="tip-item">
+              <div class="tip-dot"></div>
+              <div style="display: flex; flex-direction: column; width: 100%;">
+                <span class="tip-text-en">What aid you need (Food, medicine, financial relief)</span>
+                <span class="tip-text-ur">آپ کو کس چیز کی ضرورت ہے (راشن، دوا یا نقد رقم)</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Submit Action Button -->
+        <button id="submit-btn" class="btn" onclick="submitCase()" disabled>
+          <span>Submit Request</span> / <span>درخواست بھیجیں</span>
+        </button>
+      </div>
+
+      <!-- STATE 3: Success View -->
+      <div id="success-state" class="state-card">
+        <span class="status-icon success">✓</span>
+        <h2 class="urdu-text" style="color: var(--color-success); font-weight: bold; margin-bottom: 8px;">آپ کی درخواست موصول ہو گئی</h2>
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">Aapki darkhwast mil gayi</h3>
+        
+        <div id="success-ticket" class="ticket-box">TKT-0000000</div>
+        
+        <p class="success-instruction">
+          Hum jald hi aap sy rabta karengy. Yeh reference number apne paas rakhein.<br>
+          <span class="urdu-right" style="font-size: 15px; color: var(--text-muted); display: block; text-align: center; margin-top: 8px;">
+            ہم جلد ہی آپ سے رابطہ کریں گے۔ یہ ریفرنس نمبر اپنے پاس محفوظ رکھیں۔
+          </span>
+        </p>
+        
+        <div class="nav-buttons">
+          <button class="btn" onclick="resetForm()">
+            <span>New Submission</span> / <span>نئی درخواست کریں</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STATE 4: Soft Warning View (INVALID/FAILED state) -->
+      <div id="warning-state" class="state-card">
+        <span class="status-icon warning">⚠️</span>
+        <h2 class="urdu-text" style="color: var(--color-warning); font-weight: bold; margin-bottom: 8px;">درخواست کا جائزہ لیا جائے گا</h2>
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">Review Needed</h3>
+        
+        <div id="warning-ticket" class="ticket-box">TKT-0000000</div>
+        
+        <div class="alert-box warning">
+          <div class="alert-heading">Notice / اہم اطلاع</div>
+          <div class="alert-message">
+            Aapki darkhwast submit ho gayi lekin review ki zaroorat hai. Hum jald hi mazeed maloomat ke liye rabta karenge.<br>
+            <span class="urdu-right" style="font-size: 13.5px; display: block; margin-top: 6px;">
+              آپ کی درخواست جمع ہو گئی ہے لیکن مزید تصدیق کی ضرورت ہے۔ ہم جلد رابطہ کریں گے۔
+            </span>
+          </div>
+        </div>
+        
+        <div class="nav-buttons">
+          <button class="btn" onclick="resetForm()">
+            <span>New Submission</span> / <span>نئی درخواست کریں</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- STATE 5: Friendly Error State -->
+      <div id="error-state" class="state-card">
+        <span class="status-icon error">❌</span>
+        <h2 class="urdu-text" style="color: var(--color-error); font-weight: bold; margin-bottom: 8px;">درخواست جمع نہیں ہو سکی</h2>
+        <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 12px; color: var(--text-primary);">Submission Failed</h3>
+        
+        <div class="alert-box error">
+          <div id="error-heading" class="alert-heading">Error / غلطی</div>
+          <div id="error-message-text" class="alert-message">
+            Abhi server busy hai. Thodi der baad dobara try karein.
+          </div>
+        </div>
+        
+        <div class="nav-buttons">
+          <button id="retry-btn" class="btn" onclick="resetForm()">
+            <span>Go Back</span> / <span>واپس جائیں</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- STATE 2: Loading Full-Screen Blur Overlay -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-content">
+      <div class="spinner"></div>
+      <h3 class="pipeline-title">AI Processing Sequence...</h3>
+      
+      <div class="pipeline-steps">
+        <div id="step-1" class="pipeline-step pending">
+          <div class="step-indicator"></div>
+          <span class="step-text">Intake Agent — Checking your application...</span>
+        </div>
+        <div id="step-2" class="pipeline-step pending">
+          <div class="step-indicator"></div>
+          <span class="step-text">Validation Agent — Running fraud screen...</span>
+        </div>
+        <div id="step-3" class="pipeline-step pending">
+          <div class="step-indicator"></div>
+          <span class="step-text">Severity Agent — Computing priority...</span>
+        </div>
+        <div id="step-4" class="pipeline-step pending">
+          <div class="step-indicator"></div>
+          <span class="step-text">Action Agent — Creating relief proposal...</span>
+        </div>
+        <div id="step-5" class="pipeline-step pending">
+          <div class="step-indicator"></div>
+          <span class="step-text">Dispatch Agent — Preparing SMS queues...</span>
+        </div>
+      </div>
+      
+      <div class="wait-notice">
+        Kripya intezaar karein — 15 se 30 seconds<br>
+        <span class="urdu-right" style="font-size: 14px; color: var(--text-muted); display: block; text-align: center; margin-top: 6px;">
+          برائے مہربانی انتظار کیجیے (15 سے 30 سیکنڈ)
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Constants & Global Variables
+    const BASE_URL = 'https://raah-ai-backend.onrender.com';
+    let stageInterval = null;
+
+    // Check NGO ID as soon as page loads
+    window.addEventListener('DOMContentLoaded', () => {
+      const ngoId = getQueryParamsNgoId();
+      if (!ngoId) {
+        showGlobalError('Yeh link galat hai. Apni NGO sy dobara link maangein.<br><span class="urdu-right" style="font-size: 14px; display: block; margin-top: 6px;">یہ لنک غلط ہے۔ اپنے ادارے سے نیا لنک طلب کریں۔</span>', 'Configuration Error / لنک کی خرابی');
+        // Hide form contents entirely
+        document.getElementById('msg-input').disabled = true;
+        document.getElementById('submit-btn').disabled = true;
+      }
+    });
+
+    // Extract Query Param
+    function getQueryParamsNgoId() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('ngo_id');
+    }
+
+    // Input characters and validation handler
+    function handleInput() {
+      const textarea = document.getElementById('msg-input');
+      const counter = document.getElementById('char-counter');
+      const btn = document.getElementById('submit-btn');
+      
+      const length = textarea.value.trim().length;
+      counter.innerText = length;
+
+      if (length >= 20) {
+        btn.removeAttribute('disabled');
+      } else {
+        btn.setAttribute('disabled', 'true');
+      }
+    }
+
+    // Timer-based 5-stage pipeline simulation transitions
+    function startStageTimer() {
+      stopStageTimer(); // clear previous if any
+      
+      const steps = [
+        document.getElementById('step-1'),
+        document.getElementById('step-2'),
+        document.getElementById('step-3'),
+        document.getElementById('step-4'),
+        document.getElementById('step-5')
+      ];
+
+      // Reset all steps first
+      steps.forEach(step => {
+        step.className = 'pipeline-step pending';
+      });
+
+      const startTime = Date.now();
+
+      function updateStages() {
+        const elapsed = (Date.now() - startTime) / 1000; // in seconds
+
+        // Active ranges:
+        // 0-4s: Step 1 active
+        // 4-8s: Step 2 active, Step 1 completed
+        // 8-13s: Step 3 active, Steps 1 & 2 completed
+        // 13-18s: Step 4 active, Steps 1-3 completed
+        // 18s+: Step 5 active, Steps 1-4 completed
+
+        if (elapsed < 4) {
+          setActiveStep(0, steps);
+        } else if (elapsed < 8) {
+          setCompletedStep(0, steps);
+          setActiveStep(1, steps);
+        } else if (elapsed < 13) {
+          setCompletedStep(0, steps);
+          setCompletedStep(1, steps);
+          setActiveStep(2, steps);
+        } else if (elapsed < 18) {
+          setCompletedStep(0, steps);
+          setCompletedStep(1, steps);
+          setCompletedStep(2, steps);
+          setActiveStep(3, steps);
+        } else {
+          setCompletedStep(0, steps);
+          setCompletedStep(1, steps);
+          setCompletedStep(2, steps);
+          setCompletedStep(3, steps);
+          setActiveStep(4, steps);
+        }
+      }
+
+      updateStages(); // run immediately
+      stageInterval = setInterval(updateStages, 250);
+    }
+
+    function setActiveStep(idx, steps) {
+      if (idx >= 0 && idx < steps.length) {
+        steps[idx].className = 'pipeline-step active';
+      }
+    }
+
+    function setCompletedStep(idx, steps) {
+      if (idx >= 0 && idx < steps.length) {
+        steps[idx].className = 'pipeline-step completed';
+      }
+    }
+
+    function stopStageTimer() {
+      if (stageInterval) {
+        clearInterval(stageInterval);
+        stageInterval = null;
+      }
+    }
+
+    // Submit request method
+    async function submitCase() {
+      const text = document.getElementById('msg-input').value.trim();
+      const ngoId = getQueryParamsNgoId();
+
+      // Client-side validations
+      if (!text || text.length < 20) {
+        showGlobalError('Kuch likhein phir submit karein (kam az kam 20 characters).<br><span class="urdu-right" style="font-size: 14px; display: block; margin-top: 6px;">درخواست میں کم از کم 20 الفاظ لکھیں۔</span>', 'Input Validation / غلطی');
+        return;
+      }
+      if (!ngoId) {
+        showGlobalError('Yeh link galat hai. Apni NGO sy dobara link maangein.<br><span class="urdu-right" style="font-size: 14px; display: block; margin-top: 6px;">یہ لنک غلط ہے۔ اپنے ادارے سے نیا لنک طلب کریں۔</span>', 'Configuration Error / لنک کی خرابی');
+        return;
+      }
+
+      // Display loading overlay & run stage timer
+      document.getElementById('loading-overlay').style.display = 'flex';
+      startStageTimer();
+
+      try {
+        const response = await fetch(`${BASE_URL}/api/v1/submit/raw`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            raw_input: text,
+            submission_source: 'web_form',
+            assigned_ngo_id: ngoId
+          }),
+          signal: AbortSignal.timeout(65000) // 65 seconds execution boundary
+        });
+
+        stopStageTimer();
+        document.getElementById('loading-overlay').style.display = 'none';
+
+        if (!response.ok) {
+          showGlobalError('Server error. Dobara try karein.<br><span class="urdu-right" style="font-size: 14px; display: block; margin-top: 6px;">سرور میں کوئی خرابی پیش آئی ہے۔ براہ کرم کچھ دیر بعد دوبارہ کوشش کریں۔</span>', 'Server Error / سرور کی خرابی');
+          return;
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+          showGlobalError('Server error. Dobara try karein.<br><span class="urdu-right" style="font-size: 14px; display: block; margin-top: 6px;">سرور میں کوئی خرابی پیش آئی ہے۔ براہ کرم کچھ دیر بعد دوبارہ کوشش کریں۔</span>', 'Server Error / سرور کی خرابی');
+          return;
+        }
+
+        // Soft warning filters (Either verification flags INVALID, or dispatch fails)
+        if (data.validation_status === 'INVALID' || data.dispatch_status === 'FAILED') {
+          showWarningView(data.ticket_id || 'TKT-PENDING');
+          return;
+        }
+
+        // Complete pipeline success
+        showSuccessView(data.ticket_id || 'TKT-PENDING');
+
+      } catch (err) {
+        stopStageTimer();
+        document.getElementById('loading-overlay').style.display = 'none';
+        
+        if (err.name === 'TimeoutError' || err.name === 'AbortError') {
+          showGlobalError('Pipeline mein waqt lag raha hai. Thodi der baad Applications tab check karein.<br><span class="urdu-right" style="font-size: 14px; display: block; margin-top: 6px;">درخواست پروسیس ہونے میں زیادہ وقت لگ رہا ہے۔ کچھ دیر بعد دوبارہ کوشش کریں۔</span>', 'Pipeline Timeout / وقت کی حد ختم');
+        } else {
+          showGlobalError('Network error. Internet connection check karein aur dobara try karein.<br><span class="urdu-right" style="font-size: 14px; display: block; margin-top: 6px;">انٹرنیٹ کنکشن کا مسئلہ ہے۔ اپنے نیٹ ورک کو چیک کریں اور دوبارہ کوشش کریں۔</span>', 'Network Error / نیٹ ورک کی خرابی');
+        }
+      }
+    }
+
+    // Success state view transition
+    function showSuccessView(ticketId) {
+      document.getElementById('form-state').style.display = 'none';
+      document.getElementById('success-ticket').innerText = ticketId;
+      document.getElementById('success-state').style.display = 'block';
+    }
+
+    // Warning state view transition
+    function showWarningView(ticketId) {
+      document.getElementById('form-state').style.display = 'none';
+      document.getElementById('warning-ticket').innerText = ticketId;
+      document.getElementById('warning-state').style.display = 'block';
+    }
+
+    // Global descriptive inline errors
+    function showGlobalError(msg, heading = 'Error / غلطی') {
+      document.getElementById('form-state').style.display = 'none';
+      document.getElementById('success-state').style.display = 'none';
+      document.getElementById('warning-state').style.display = 'none';
+      
+      document.getElementById('error-heading').innerHTML = heading;
+      document.getElementById('error-message-text').innerHTML = msg;
+      
+      // If we are missing NGO id, hide the retry redirect trigger
+      const ngoId = getQueryParamsNgoId();
+      const retryBtn = document.getElementById('retry-btn');
+      if (!ngoId) {
+        retryBtn.style.display = 'none';
+      } else {
+        retryBtn.style.display = 'inline-flex';
+      }
+
+      document.getElementById('error-state').style.display = 'block';
+    }
+
+    // Reset Form View back to State 1
+    function resetForm() {
+      // Clear inputs
+      document.getElementById('msg-input').value = '';
+      document.getElementById('char-counter').innerText = '0';
+      document.getElementById('submit-btn').setAttribute('disabled', 'true');
+
+      // Reset views
+      document.getElementById('success-state').style.display = 'none';
+      document.getElementById('warning-state').style.display = 'none';
+      document.getElementById('error-state').style.display = 'none';
+      document.getElementById('form-state').style.display = 'block';
+    }
+  </script>
+</body>
+</html>
