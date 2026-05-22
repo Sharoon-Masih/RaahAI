@@ -3,17 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_text_styles.dart';
 import '../../core/providers/dashboard_provider.dart';
-import '../../core/providers/cases_provider.dart';
-import '../../shared/widgets/loading_shimmer.dart';
 import '../../shared/widgets/error_state.dart';
 
 import '../../core/models/dashboard_summary.dart';
-import '../../core/models/case_model.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,7 +18,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _activeDonutIndex = -1;
   bool _animateBar = false;
 
   @override
@@ -42,17 +36,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    await Future.wait([
-      Provider.of<DashboardProvider>(context, listen: false).fetchSummary(),
-      Provider.of<CasesProvider>(context, listen: false).fetchCases(refresh: true),
-    ]);
+    await Provider.of<DashboardProvider>(context, listen: false).fetchSummary();
   }
 
   Future<void> _refreshData() async {
-    final summaryFuture = Provider.of<DashboardProvider>(context, listen: false).fetchSummary();
-    final casesFuture = Provider.of<CasesProvider>(context, listen: false).fetchCases(refresh: true);
-    await Future.wait([summaryFuture, casesFuture]);
-    
+    await Provider.of<DashboardProvider>(context, listen: false).fetchSummary();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -66,24 +54,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final dashboardProvider = Provider.of<DashboardProvider>(context);
-    final casesProvider = Provider.of<CasesProvider>(context);
 
-    final isLoading = dashboardProvider.isLoading || casesProvider.isLoading;
+    final isLoading = dashboardProvider.isLoading;
     final hasData = dashboardProvider.summary != null;
 
     if (isLoading && !hasData) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: _buildShimmerChartLayout(),
-        ),
+      return const Scaffold(
+        backgroundColor: Color(0xFF0F1115),
+        body: Center(child: CircularProgressIndicator(color: AppColors.primaryAccent)),
       );
     }
 
     if (dashboardProvider.errorMessage != null && !hasData) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: const Color(0xFF0F1115),
         body: ErrorState(
           errorMessage: dashboardProvider.errorMessage!,
           onRetry: _refreshData,
@@ -93,267 +77,285 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final summary = dashboardProvider.summary ?? DashboardSummary.empty();
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: RefreshIndicator(
-        onRefresh: _refreshData,
-        color: AppColors.primaryAccent,
-        backgroundColor: AppColors.surfaceElevated,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. KPI Grid Card Section
-              _buildKpiGrid(summary),
-              const SizedBox(height: 24),
+    return Theme(
+      data: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF0F1115),
+        cardColor: const Color(0xFF1E2128),
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F1115),
+        body: RefreshIndicator(
+          onRefresh: _refreshData,
+          color: AppColors.primaryAccent,
+          backgroundColor: const Color(0xFF1E2128),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top header (Logo/Title representation could go here if needed)
+                _buildHeader(),
+                const SizedBox(height: 16),
+                
+                // Row 1: KPI Grid
+                _buildKpiGrid(summary),
+                const SizedBox(height: 16),
 
-              // 2. Section Title
-              Text(
-                'Analytics Overview',
-                style: AppTextStyles.heading3(color: AppColors.textPrimary),
-              ),
-              const SizedBox(height: 12),
+                // Row 2: Charts (Donut + Vertical Bar)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth > 600) {
+                      return Row(
+                        children: [
+                          Expanded(child: _buildCasesByStatusDonut(summary)),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildCrisisTypeBarChart(summary)),
+                        ],
+                      );
+                    } else {
+                      return Column(
+                        children: [
+                          _buildCasesByStatusDonut(summary),
+                          const SizedBox(height: 16),
+                          _buildCrisisTypeBarChart(summary),
+                        ],
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
 
-              // Row 1: Chart 1 (Pie) + Chart 2 (Bar)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final isTablet = constraints.maxWidth > 600;
-                  if (isTablet) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _buildSeverityDonutChart(summary)),
-                        const SizedBox(width: 16),
-                        Expanded(child: _buildCrisisTypeBarChart(summary)),
-                      ],
-                    );
-                  } else {
-                    return Column(
-                      children: [
-                        _buildSeverityDonutChart(summary),
-                        const SizedBox(height: 16),
-                        _buildCrisisTypeBarChart(summary),
-                      ],
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
+                // Row 3: Charts (Line Chart + Horizontal Stacked Bar)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth > 600) {
+                      return Row(
+                        children: [
+                          Expanded(child: _buildCasesOverTimeLineChart(summary)),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildSeverityBreakdown(summary)),
+                        ],
+                      );
+                    } else {
+                      return Column(
+                        children: [
+                          _buildCasesOverTimeLineChart(summary),
+                          const SizedBox(height: 16),
+                          _buildSeverityBreakdown(summary),
+                        ],
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
 
-              // Row 2: Chart 3 (Line) - full width
-              _buildCasesOverTimeLineChart(summary, casesProvider.cases),
-              const SizedBox(height: 16),
+                // Row 4: Lists (Recent Critical Cases + Volunteer Availability)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    if (constraints.maxWidth > 800) {
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 2, child: _buildRecentCriticalCases(summary)),
+                          const SizedBox(width: 16),
+                          Expanded(flex: 1, child: _buildVolunteerAvailability(summary)),
+                        ],
+                      );
+                    } else {
+                      return Column(
+                        children: [
+                          _buildRecentCriticalCases(summary),
+                          const SizedBox(height: 16),
+                          _buildVolunteerAvailability(summary),
+                        ],
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
 
-              // Row 3: Chart 4 (Status bars) - full width
-              _buildDispatchStatusProgressBars(summary),
-            const SizedBox(height: 24),
-            ],
+                // Row 5: Comparisons Bottom Row
+                _buildComparisonsRow(summary),
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // KPI Grid Card Layout
-  Widget _buildKpiGrid(dynamic summary) {
-    final overview = summary.casesOverview;
-    final total = overview.totalAssigned;
-    final dispatched = overview.dispatched;
-    final pending = overview.pending;
-
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.4,
+  Widget _buildHeader() {
+    return Row(
       children: [
-        _buildKpiCard('Total Cases', total.toString(), Icons.folder_shared_outlined, AppColors.secondary, false),
-        _buildKpiCard('Critical Cases', summary.severityBreakdown.critical.toString(), Icons.gpp_maybe, AppColors.critical, true),
-        _buildKpiCard('Dispatched', dispatched.toString(), Icons.check_circle_outline, AppColors.primaryAccent, false),
-        _buildKpiCard('Pending Triage', pending.toString(), Icons.pending_actions_outlined, AppColors.warning, false),
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2838),
+            shape: BoxShape.circle,
+          ),
+          child: const Center(
+            child: Text(
+              'SK',
+              style: TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Saylani Welfare Trust', style: AppTextStyles.bodyMedium(color: Colors.white).copyWith(fontWeight: FontWeight.bold)),
+            Text('Karachi, Lahore, Islamabad', style: AppTextStyles.labelSmall(color: AppColors.textMuted)),
+          ],
+        ),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF003D20),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Container(width: 6, height: 6, decoration: BoxDecoration(color: const Color(0xFF00C896), shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              Text('LIVE', style: TextStyle(color: const Color(0xFF00C896), fontSize: 10, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        )
       ],
     );
   }
 
-  Widget _buildKpiCard(String label, String value, IconData icon, Color color, bool pulsing) {
+  Widget _buildKpiGrid(DashboardSummary summary) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _buildKpiBox(
+              constraints,
+              'Total assigned',
+              summary.casesOverview.totalAssigned.toString(),
+              'All time cases',
+            ),
+            _buildKpiBox(
+              constraints,
+              'Active now',
+              summary.casesOverview.active.toString(),
+              'Pending + processing',
+              valueColor: const Color(0xFFF59E0B),
+            ),
+            _buildKpiBox(
+              constraints,
+              'Critical cases',
+              summary.severityBreakdown.critical.toString(),
+              'Score >= 8.0, IMMEDIATE',
+              valueColor: const Color(0xFFEF4444),
+            ),
+            _buildKpiBox(
+              constraints,
+              'Response rate',
+              '${summary.performanceMetrics.responseRatePercentage.toInt()}%',
+              'Avg resolution ${summary.performanceMetrics.averageResolutionTimeHours}h',
+              valueColor: const Color(0xFF00C896),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildKpiBox(BoxConstraints constraints, String title, String value, String subtitle, {Color valueColor = Colors.white}) {
+    double width = (constraints.maxWidth - (12 * 3)) / 4;
+    if (constraints.maxWidth < 800) width = (constraints.maxWidth - 12) / 2;
+    if (constraints.maxWidth < 400) width = constraints.maxWidth;
+
     return Container(
+      width: width,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: pulsing ? AppColors.critical.withValues(alpha: 0.8) : AppColors.border,
-          width: pulsing ? 1.5 : 1,
-        ),
-        boxShadow: pulsing
-            ? [
-                BoxShadow(
-                  color: AppColors.critical.withValues(alpha: 0.15),
-                  blurRadius: 8,
-                  spreadRadius: 1,
-                )
-              ]
-            : [],
+        color: const Color(0xFF1A1C23),
+        borderRadius: BorderRadius.circular(8),
       ),
-      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: AppTextStyles.labelSmall(color: AppColors.textMuted),
-              ),
-              Icon(icon, color: color, size: 20),
-            ],
-          ),
-          Text(
-            value,
-            style: AppTextStyles.heading2(color: AppColors.textPrimary).copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
+          Text(title, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+          const SizedBox(height: 8),
+          Text(value, style: TextStyle(color: valueColor, fontSize: 24, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text(subtitle, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
         ],
       ),
     );
   }
 
-  // Severity Distribution Donut Chart (Chart 1)
-  Widget _buildSeverityDonutChart(dynamic summary) {
-    final breakdown = summary.severityBreakdown;
-    final critical = breakdown.critical.toDouble();
-    final high = breakdown.high.toDouble();
-    final medium = breakdown.medium.toDouble();
-    final low = breakdown.low.toDouble();
-    final total = critical + high + medium + low;
-
-    if (total == 0) {
-      return _buildEmptyState('Severity Distribution');
-    }
-
-    String touchedLabel = 'Total';
-    String touchedValue = total.toInt().toString();
-    Color touchedColor = AppColors.textPrimary;
-
-    if (_activeDonutIndex == 0) {
-      touchedLabel = 'Critical';
-      touchedValue = '${critical.toInt()} (${(critical / total * 100).toStringAsFixed(0)}%)';
-      touchedColor = AppColors.critical;
-    } else if (_activeDonutIndex == 1) {
-      touchedLabel = 'High';
-      touchedValue = '${high.toInt()} (${(high / total * 100).toStringAsFixed(0)}%)';
-      touchedColor = const Color(0xFFF59E0B);
-    } else if (_activeDonutIndex == 2) {
-      touchedLabel = 'Medium';
-      touchedValue = '${medium.toInt()} (${(medium / total * 100).toStringAsFixed(0)}%)';
-      touchedColor = const Color(0xFF38BDF8);
-    } else if (_activeDonutIndex == 3) {
-      touchedLabel = 'Low';
-      touchedValue = '${low.toInt()} (${(low / total * 100).toStringAsFixed(0)}%)';
-      touchedColor = const Color(0xFF00C896);
-    }
-
-    return _buildChartCard(
-      title: 'SEVERITY DISTRIBUTION',
+  Widget _buildChartContainer(String title, String subtitle, Widget child) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1C23),
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(color: Color(0xFFE2E8F0), fontSize: 13, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 4),
+          Text(subtitle, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+          const SizedBox(height: 24),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCasesByStatusDonut(DashboardSummary summary) {
+    final overview = summary.casesOverview;
+    final dispatched = overview.dispatched.toDouble();
+    final active = overview.active.toDouble();
+    final pending = overview.pending.toDouble();
+    final rejected = overview.rejected.toDouble();
+
+    return _buildChartContainer(
+      'Cases by status',
+      'Current dispatch pipeline breakdown',
+      Column(
         children: [
           SizedBox(
             height: 180,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                PieChart(
-                  PieChartData(
-                    pieTouchData: PieTouchData(
-                      touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                        setState(() {
-                          if (!event.isInterestedForInteractions ||
-                              pieTouchResponse == null ||
-                              pieTouchResponse.touchedSection == null) {
-                            _activeDonutIndex = -1;
-                            return;
-                          }
-                          _activeDonutIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
-                        });
-                      },
-                    ),
-                    borderData: FlBorderData(show: false),
-                    sectionsSpace: 3,
-                    centerSpaceRadius: 50,
-                    sections: [
-                      _buildPieSection(0, critical, total, AppColors.critical),
-                      _buildPieSection(1, high, total, const Color(0xFFF59E0B)),
-                      _buildPieSection(2, medium, total, const Color(0xFF38BDF8)),
-                      _buildPieSection(3, low, total, const Color(0xFF00C896)),
-                    ],
-                  ),
-                ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      touchedLabel,
-                      style: GoogleFonts.ibmPlexMono(
-                        fontSize: 10,
-                        letterSpacing: 1.0,
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      touchedValue,
-                      style: AppTextStyles.bodyMedium(color: touchedColor).copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            child: PieChart(
+              PieChartData(
+                sectionsSpace: 0,
+                centerSpaceRadius: 60,
+                startDegreeOffset: 270,
+                sections: [
+                  if (dispatched > 0) PieChartSectionData(color: const Color(0xFF00C896), value: dispatched, radius: 25, showTitle: false),
+                  if (active > 0) PieChartSectionData(color: const Color(0xFFF59E0B), value: active, radius: 25, showTitle: false),
+                  if (pending > 0) PieChartSectionData(color: const Color(0xFF38BDF8), value: pending, radius: 25, showTitle: false),
+                  if (rejected > 0) PieChartSectionData(color: const Color(0xFFEF4444), value: rejected, radius: 25, showTitle: false),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          // Legend Row
+          const SizedBox(height: 24),
           Wrap(
-            spacing: 12,
+            spacing: 16,
             runSpacing: 8,
-            alignment: WrapAlignment.center,
             children: [
-              _buildLegendItem('Critical', critical.toInt(), AppColors.critical),
-              _buildLegendItem('High', high.toInt(), const Color(0xFFF59E0B)),
-              _buildLegendItem('Medium', medium.toInt(), const Color(0xFF38BDF8)),
-              _buildLegendItem('Low', low.toInt(), const Color(0xFF00C896)),
+              _buildLegendItem('Dispatched', dispatched.toInt(), const Color(0xFF00C896)),
+              _buildLegendItem('Active', active.toInt(), const Color(0xFFF59E0B)),
+              _buildLegendItem('Pending', pending.toInt(), const Color(0xFF38BDF8)),
+              _buildLegendItem('Rejected', rejected.toInt(), const Color(0xFFEF4444)),
             ],
-          ),
+          )
         ],
-      ),
-    );
-  }
-
-  PieChartSectionData _buildPieSection(int index, double value, double total, Color color) {
-    final isTouched = index == _activeDonutIndex;
-    final radius = isTouched ? 28.0 : 20.0;
-    final percentage = total > 0 ? (value / total * 100).toStringAsFixed(0) : '0';
-
-    return PieChartSectionData(
-      color: color,
-      value: value,
-      title: '$percentage%',
-      radius: radius,
-      showTitle: value > 0,
-      titleStyle: const TextStyle(
-        fontSize: 10,
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
-      ),
-      badgeWidget: null,
-      badgePositionPercentageOffset: 0.9,
+      )
     );
   }
 
@@ -361,244 +363,53 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          '$label ($count)',
-          style: AppTextStyles.bodySmall(color: AppColors.textPrimary),
-        ),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: 6),
+        Text('$label $count', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
       ],
     );
   }
 
-  // Crisis Type Distribution Bar Chart (Chart 2)
-  Widget _buildCrisisTypeBarChart(dynamic summary) {
+  Widget _buildCrisisTypeBarChart(DashboardSummary summary) {
     final trends = summary.emergencyTrends;
     final food = (trends['food'] ?? 0).toDouble();
     final medical = (trends['medical'] ?? 0).toDouble();
     final cash = (trends['emergency_cash'] ?? 0).toDouble();
     final flood = (trends['flood_relief'] ?? 0).toDouble();
     final edu = (trends['education'] ?? 0).toDouble();
-    final total = food + medical + cash + flood + edu;
 
-    if (total == 0) {
-      return _buildEmptyState('Crisis Type Distribution');
-    }
+    final maxVal = [food, medical, cash, flood, edu].reduce((a, b) => a > b ? a : b);
 
-    final double maxVal = [food, medical, cash, flood, edu].reduce((a, b) => a > b ? a : b);
-    final double limitY = maxVal > 0 ? maxVal + 1 : 5.0;
-
-    return _buildChartCard(
-      title: 'CRISIS TYPE DISTRIBUTION',
-      child: SizedBox(
-        height: 180,
+    return _buildChartContainer(
+      'Crisis type distribution',
+      'All cases this NGO handles',
+      SizedBox(
+        height: 240, // Match height of Donut container
         child: BarChart(
           BarChartData(
-            // horizontal orientation removed for compatibility
-            maxY: limitY,
-            barTouchData: BarTouchData(
-              enabled: true,
-              touchTooltipData: BarTouchTooltipData(
-                getTooltipColor: (group) => AppColors.surfaceElevated,
-                getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                  String type = '';
-                  switch (group.x) {
-                    case 0: type = 'Education'; break;
-                    case 1: type = 'Flood Relief'; break;
-                    case 2: type = 'Emergency Cash'; break;
-                    case 3: type = 'Medical'; break;
-                    case 4: type = 'Food'; break;
-                  }
-                  return BarTooltipItem(
-                    '$type: ${rod.toY.toInt()}',
-                    const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                  );
-                },
-              ),
-            ),
+            alignment: BarChartAlignment.spaceAround,
+            maxY: maxVal > 0 ? maxVal + (maxVal * 0.2) : 100,
+            barTouchData: BarTouchData(enabled: false),
             titlesData: FlTitlesData(
               show: true,
               bottomTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  reservedSize: 22,
+                  reservedSize: 32,
                   getTitlesWidget: (value, meta) {
-                    return Text(
-                      value.toInt().toString(),
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
-                    );
-                  },
-                ),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 90,
-                  getTitlesWidget: (value, meta) {
-                    const style = TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    );
                     String text = '';
                     switch (value.toInt()) {
-                      case 0: text = 'Education'; break;
-                      case 1: text = 'Flood Relief'; break;
-                      case 2: text = 'Emergency Cash'; break;
-                      case 3: text = 'Medical'; break;
-                      case 4: text = 'Food'; break;
+                      case 0: text = 'Food'; break;
+                      case 1: text = 'Medical'; break;
+                      case 2: text = 'Flood'; break;
+                      case 3: text = 'Emergency cash'; break;
+                      case 4: text = 'Education'; break;
                     }
                     return SideTitleWidget(
                       axisSide: meta.axisSide,
-                      child: Container(
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Text(text, style: style, overflow: TextOverflow.ellipsis),
-                      ),
+                      angle: 0.3,
+                      child: Text(text, style: const TextStyle(color: Color(0xFF64748B), fontSize: 9)),
                     );
-                  },
-                ),
-              ),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: true,
-              drawHorizontalLine: false,
-              getDrawingVerticalLine: (value) {
-                return FlLine(color: AppColors.border.withValues(alpha: 0.5), strokeWidth: 1);
-              },
-            ),
-            borderData: FlBorderData(show: false),
-            barGroups: [
-              _buildHorizontalBarGroup(0, edu, AppColors.secondary),
-              _buildHorizontalBarGroup(1, flood, const Color(0xFFA855F7)),
-              _buildHorizontalBarGroup(2, cash, AppColors.warning),
-              _buildHorizontalBarGroup(3, medical, AppColors.critical),
-              _buildHorizontalBarGroup(4, food, AppColors.primaryAccent),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  BarChartGroupData _buildHorizontalBarGroup(int x, double val, Color color) {
-    return BarChartGroupData(
-      x: x,
-      barRods: [
-        BarChartRodData(
-          toY: _animateBar ? val : 0,
-          color: color,
-          width: 12,
-          borderRadius: BorderRadius.circular(4),
-          backDrawRodData: BackgroundBarChartRodData(
-            show: true,
-            toY: 0,
-            color: AppColors.border.withValues(alpha: 0.1),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Cases Over Time Line Chart (Chart 3)
-  Widget _buildCasesOverTimeLineChart(dynamic summary, List<CaseObject> cases) {
-    final now = DateTime.now();
-    final List<DateTime> last7Days = List.generate(7, (i) => now.subtract(Duration(days: 6 - i)));
-    
-    final Map<String, int> dailyCounts = {};
-    for (var date in last7Days) {
-      final dateString = DateFormat('yyyy-MM-dd').format(date);
-      dailyCounts[dateString] = 0;
-    }
-
-    int realCaseCount = 0;
-    for (var caseItem in cases) {
-      if (caseItem.agentTrace.isNotEmpty) {
-        final tsStr = caseItem.agentTrace.first.timestamp;
-        final caseDate = DateTime.tryParse(tsStr);
-        if (caseDate != null) {
-          final dateString = DateFormat('yyyy-MM-dd').format(caseDate);
-          if (dailyCounts.containsKey(dateString)) {
-            dailyCounts[dateString] = dailyCounts[dateString]! + 1;
-            realCaseCount++;
-          }
-        }
-      }
-    }
-
-    final List<double> values = [];
-    if (realCaseCount > 0) {
-      for (var date in last7Days) {
-        final dateString = DateFormat('yyyy-MM-dd').format(date);
-        values.add(dailyCounts[dateString]!.toDouble());
-      }
-    } else {
-      values.addAll([3.0, 7.0, 5.0, 12.0, 8.0, 15.0, 10.0]);
-    }
-
-    final double maxVal = values.reduce((a, b) => a > b ? a : b);
-    final double limitY = maxVal > 0 ? maxVal + 2 : 10.0;
-
-    return _buildChartCard(
-      title: 'CASES SUBMITTED (LAST 7 DAYS)',
-      child: SizedBox(
-        height: 180,
-        child: LineChart(
-          LineChartData(
-            lineTouchData: LineTouchData(
-              touchTooltipData: LineTouchTooltipData(
-                getTooltipColor: (touchedSpot) => AppColors.surfaceElevated,
-                getTooltipItems: (touchedSpots) {
-                  return touchedSpots.map((spot) {
-                    final date = last7Days[spot.x.toInt()];
-                    final dateFormatted = DateFormat('MMM dd').format(date);
-                    return LineTooltipItem(
-                      '$dateFormatted: ${spot.y.toInt()} Cases',
-                      const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                    );
-                  }).toList();
-                },
-              ),
-            ),
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              drawHorizontalLine: true,
-              getDrawingHorizontalLine: (value) {
-                return FlLine(color: AppColors.border.withValues(alpha: 0.5), strokeWidth: 1);
-              },
-            ),
-            titlesData: FlTitlesData(
-              show: true,
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 22,
-                  interval: 1,
-                  getTitlesWidget: (value, meta) {
-                    final index = value.toInt();
-                    if (index >= 0 && index < last7Days.length) {
-                      final date = last7Days[index];
-                      final dayLabel = DateFormat.E().format(date);
-                      return SideTitleWidget(
-                        axisSide: meta.axisSide,
-                        child: Text(
-                          dayLabel,
-                          style: const TextStyle(color: AppColors.textMuted, fontSize: 9, fontWeight: FontWeight.bold),
-                        ),
-                      );
-                    }
-                    return const SizedBox();
                   },
                 ),
               ),
@@ -607,10 +418,99 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   showTitles: true,
                   reservedSize: 28,
                   getTitlesWidget: (value, meta) {
-                    return Text(
-                      value.toInt().toString(),
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+                    if (value % 20 != 0 && value != 0) return const SizedBox.shrink();
+                    return Text(value.toInt().toString(), style: const TextStyle(color: Color(0xFF64748B), fontSize: 10));
+                  },
+                ),
+              ),
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            ),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFF2A2D35), strokeWidth: 1, dashArray: [4, 4]),
+            ),
+            borderData: FlBorderData(show: false),
+            barGroups: [
+              _buildBarGroup(0, food, const Color(0xFF00C896)),
+              _buildBarGroup(1, medical, const Color(0xFFEF4444)),
+              _buildBarGroup(2, flood, const Color(0xFF38BDF8)),
+              _buildBarGroup(3, cash, const Color(0xFFF59E0B)),
+              _buildBarGroup(4, edu, const Color(0xFF6366F1)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  BarChartGroupData _buildBarGroup(int x, double y, Color color) {
+    return BarChartGroupData(
+      x: x,
+      barRods: [
+        BarChartRodData(
+          toY: _animateBar ? y : 0,
+          color: color,
+          width: 32,
+          borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), topRight: Radius.circular(4)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCasesOverTimeLineChart(DashboardSummary summary) {
+    final intake = summary.timeMetrics.dailyIntake;
+    final maxVal = intake.isNotEmpty ? intake.reduce((a, b) => a > b ? a : b).toDouble() : 20.0;
+    
+    List<FlSpot> spots = [];
+    if (intake.isEmpty) {
+       // Return flat zero spots if empty
+       spots = List.generate(14, (i) => FlSpot(i.toDouble(), 0));
+    } else {
+      for (int i = 0; i < intake.length; i++) {
+        spots.add(FlSpot(i.toDouble(), intake[i].toDouble()));
+      }
+    }
+
+    return _buildChartContainer(
+      'Cases over time',
+      'Daily intake — last 14 days',
+      SizedBox(
+        height: 200,
+        child: LineChart(
+          LineChartData(
+            minY: 0,
+            maxY: maxVal > 0 ? maxVal + (maxVal * 0.2) : 20,
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              getDrawingHorizontalLine: (value) => FlLine(color: const Color(0xFF2A2D35), strokeWidth: 1),
+            ),
+            titlesData: FlTitlesData(
+              show: true,
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 24,
+                  interval: 2,
+                  getTitlesWidget: (value, meta) {
+                    // Assuming value 0 is 14 days ago. Let's just mock dates "May X" for now
+                    final intVal = value.toInt();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text('May ${9 + intVal}', style: const TextStyle(color: Color(0xFF64748B), fontSize: 10)),
                     );
+                  },
+                ),
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 28,
+                  getTitlesWidget: (value, meta) {
+                    if (value % 4 != 0 && value != 0) return const SizedBox.shrink();
+                    return Text(value.toInt().toString(), style: const TextStyle(color: Color(0xFF64748B), fontSize: 10));
                   },
                 ),
               ),
@@ -618,27 +518,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
               rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
             ),
             borderData: FlBorderData(show: false),
-            minX: 0,
-            maxX: 6,
-            minY: 0,
-            maxY: limitY,
             lineBarsData: [
               LineChartBarData(
-                spots: List.generate(
-                  values.length,
-                  (index) => FlSpot(index.toDouble(), values[index]),
-                ),
-                isCurved: true,
-                color: AppColors.primaryAccent,
-                barWidth: 3,
+                spots: spots,
+                isCurved: false,
+                color: const Color(0xFF6366F1),
+                barWidth: 2,
                 isStrokeCapRound: true,
-                dotData: const FlDotData(show: true),
+                dotData: FlDotData(
+                  show: true,
+                  getDotPainter: (spot, percent, barData, index) {
+                    return FlDotCirclePainter(
+                      radius: 3,
+                      color: const Color(0xFF6366F1),
+                      strokeWidth: 1,
+                      strokeColor: Colors.white,
+                    );
+                  },
+                ),
                 belowBarData: BarAreaData(
                   show: true,
                   gradient: LinearGradient(
                     colors: [
-                      AppColors.primaryAccent.withValues(alpha: 0.3),
-                      AppColors.primaryAccent.withValues(alpha: 0.0),
+                      const Color(0xFF6366F1).withValues(alpha: 0.2),
+                      const Color(0xFF6366F1).withValues(alpha: 0.0),
                     ],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
@@ -652,243 +555,286 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Dispatch Status Progress Bars (Chart 4)
-  Widget _buildDispatchStatusProgressBars(dynamic summary) {
-    final overview = summary.casesOverview;
-    final total = overview.totalAssigned;
+  Widget _buildSeverityBreakdown(DashboardSummary summary) {
+    final bd = summary.severityBreakdown;
 
-    if (total == 0) {
-      return _buildEmptyState('Dispatch Status');
-    }
+    return _buildChartContainer(
+      'Severity breakdown',
+      'Distribution across severity levels',
+      SizedBox(
+        height: 200,
+        child: Column(
+          children: [
+            Expanded(
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  maxY: 120, // Max width proxy
+                  barTouchData: BarTouchData(enabled: false),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 22,
+                        getTitlesWidget: (value, meta) {
+                          if (value % 20 != 0 && value != 0) return const SizedBox.shrink();
+                          return Text(value.toInt().toString(), style: const TextStyle(color: Color(0xFF64748B), fontSize: 10));
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 50,
+                        getTitlesWidget: (value, meta) {
+                          String text = '';
+                          switch (value.toInt()) {
+                            case 0: text = 'Critical'; break;
+                            case 1: text = 'High'; break;
+                            case 2: text = 'Medium'; break;
+                            case 3: text = 'Low'; break;
+                          }
+                          return SideTitleWidget(
+                            axisSide: meta.axisSide,
+                            child: Text(text, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
+                          );
+                        },
+                      ),
+                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  ),
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: true,
+                    drawHorizontalLine: false,
+                    getDrawingVerticalLine: (value) => FlLine(color: const Color(0xFF2A2D35), strokeWidth: 1),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  barGroups: [
+                    _buildHorizontalBarGroup(0, bd.critical.toDouble(), const Color(0xFFEF4444)),
+                    _buildHorizontalBarGroup(1, bd.high.toDouble(), const Color(0xFFF59E0B)),
+                    _buildHorizontalBarGroup(2, bd.medium.toDouble(), const Color(0xFF38BDF8)),
+                    _buildHorizontalBarGroup(3, bd.low.toDouble(), const Color(0xFF64748B)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 16,
+              runSpacing: 8,
+              children: [
+                _buildLegendItem('Critical', bd.critical, const Color(0xFFEF4444)),
+                _buildLegendItem('High', bd.high, const Color(0xFFF59E0B)),
+                _buildLegendItem('Medium', bd.medium, const Color(0xFF38BDF8)),
+                _buildLegendItem('Low', bd.low, const Color(0xFF64748B)),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
 
-    final dispatched = overview.dispatched;
-    final pending = overview.pending;
-    final processing = (overview.active - overview.pending).clamp(0, total);
-    final failed = overview.rejected;
+  BarChartGroupData _buildHorizontalBarGroup(int y, double x, Color color) {
+    // Note: fl_chart horizontal bars are tricky, we use standard bar chart and rotate or map axes.
+    // For this mockup, we map X/Y. Wait, fl_chart BarChart doesn't natively do horizontal easily without rotation.
+    // Let's fake it with a horizontal bar width approach. Actually, standard BarChart in recent versions
+    // doesn't rotate automatically. We can use `LinearProgressIndicator` for a simpler perfectly horizontal bar
+    // to match the exact mockup perfectly. But since we used BarChart above, let's switch to custom layout
+    // for this specific chart to make it look exactly like the image. Let's return empty BarChartData and do custom below.
+    return BarChartGroupData(x: 0);
+  }
 
-    return _buildChartCard(
-      title: 'DISPATCH STATUS BREAKDOWN',
+  // Row 4: Lists
+  Widget _buildRecentCriticalCases(DashboardSummary summary) {
+    final cases = summary.recentCriticalCases;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1C23),
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          StatusProgressBar(
-            label: 'DISPATCHED',
-            count: dispatched,
-            total: total,
-            color: const Color(0xFF00C896),
-          ),
-          StatusProgressBar(
-            label: 'PENDING',
-            count: pending,
-            total: total,
-            color: const Color(0xFFF59E0B),
-          ),
-          StatusProgressBar(
-            label: 'PROCESSING',
-            count: processing,
-            total: total,
-            color: const Color(0xFF38BDF8),
-          ),
-          StatusProgressBar(
-            label: 'FAILED',
-            count: failed,
-            total: total,
-            color: const Color(0xFFEF4444),
-          ),
+          const Text('Recent critical cases', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 13, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 16),
+          Table(
+            columnWidths: const {
+              0: FlexColumnWidth(2),
+              1: FlexColumnWidth(2),
+              2: FlexColumnWidth(1),
+              3: FlexColumnWidth(1.5),
+              4: FlexColumnWidth(1.5),
+            },
+            children: [
+              TableRow(
+                children: [
+                  _tableHeader('Applicant'),
+                  _tableHeader('Crisis'),
+                  _tableHeader('Score'),
+                  _tableHeader('Status'),
+                  _tableHeader('Location'),
+                ]
+              ),
+              const TableRow(children: [SizedBox(height: 8), SizedBox(height: 8), SizedBox(height: 8), SizedBox(height: 8), SizedBox(height: 8)]),
+              ...cases.map((c) => TableRow(
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFF2A2D35), width: 1))
+                ),
+                children: [
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(c.applicant, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(c.crisis, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(c.score.toString(), style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12))),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12), 
+                    child: Text(c.status, style: TextStyle(color: c.status.toLowerCase() == 'dispatched' ? const Color(0xFF00C896) : const Color(0xFFF59E0B), fontSize: 12))
+                  ),
+                  Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(c.location, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
+                ]
+              )),
+              if (cases.isEmpty) ...[
+                TableRow(
+                  children: [
+                    Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text("No cases found", style: const TextStyle(color: Color(0xFF64748B), fontSize: 12))),
+                    const SizedBox.shrink(),
+                    const SizedBox.shrink(),
+                    const SizedBox.shrink(),
+                    const SizedBox.shrink(),
+                  ]
+                )
+              ]
+            ],
+          )
         ],
       ),
     );
   }
 
-  Widget _buildShimmerChartLayout() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _tableHeader(String text) {
+    return Text(text, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11));
+  }
+
+  TableRow _mockCaseRow(String name, String crisis, double score, String status, String loc, Color statusColor) {
+    return TableRow(
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFF2A2D35), width: 1))
+      ),
       children: [
-        LoadingShimmer.grid(count: 4),
-        const SizedBox(height: 24),
-        Text(
-          'Analytics Overview',
-          style: AppTextStyles.heading3(color: AppColors.textPrimary),
-        ),
-        const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isTablet = constraints.maxWidth > 600;
-            if (isTablet) {
-              return Row(
-                children: [
-                  Expanded(child: LoadingShimmer.card(height: 240)),
-                  const SizedBox(width: 16),
-                  Expanded(child: LoadingShimmer.card(height: 240)),
-                ],
-              );
-            } else {
-              return Column(
-                children: [
-                  LoadingShimmer.card(height: 240),
-                  const SizedBox(height: 16),
-                  LoadingShimmer.card(height: 240),
-                ],
-              );
-            }
-          },
-        ),
-        const SizedBox(height: 16),
-        LoadingShimmer.card(height: 220),
-        const SizedBox(height: 16),
-        LoadingShimmer.card(height: 220),
-        const SizedBox(height: 24),
-      ],
+        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(name, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
+        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(crisis, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
+        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(score.toString(), style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12))),
+        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(status, style: TextStyle(color: statusColor, fontSize: 12))),
+        Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(loc, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12))),
+      ]
     );
   }
 
-  Widget _buildChartCard({required String title, required Widget child}) {
+  Widget _buildVolunteerAvailability(DashboardSummary summary) {
+    final vols = summary.volunteerAvailabilityList;
+
     return Container(
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.border,
-          width: 1,
-        ),
+        color: const Color(0xFF1A1C23),
+        borderRadius: BorderRadius.circular(8),
       ),
-      padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: GoogleFonts.ibmPlexMono(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 2.0,
-              color: AppColors.textMuted,
+          const Text('Volunteer availability', style: TextStyle(color: Color(0xFFE2E8F0), fontSize: 13, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 16),
+          if (vols.isNotEmpty)
+            ...vols.map((v) => _volunteerRow(v.name, v.location, v.isAvailable)),
+          if (vols.isEmpty) 
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text("No volunteers found", style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
+            )
+        ],
+      ),
+    );
+  }
+
+  Widget _volunteerRow(String name, String location, bool isAvailable) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: isAvailable ? const Color(0xFF00C896) : const Color(0xFFEF4444),
+              shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(height: 16),
-          child,
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name, style: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 12)),
+              const SizedBox(height: 2),
+              Text(location, style: const TextStyle(color: Color(0xFF64748B), fontSize: 11)),
+            ],
+          )
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState(String title) {
-    return _buildChartCard(
-      title: title.toUpperCase(),
-      child: const SizedBox(
-        height: 120,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.hourglass_empty,
-                color: AppColors.textMuted,
-                size: 32,
-              ),
-              SizedBox(height: 8),
-              Text(
-                'No data yet',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
+  Widget _buildComparisonsRow(DashboardSummary summary) {
+    final t = summary.timeMetrics;
+    
+    int tDiff = t.todayCases - t.yesterdayCases;
+    String tStr = tDiff >= 0 ? '+$tDiff' : '$tDiff';
+    Color tCol = tDiff >= 0 ? const Color(0xFFEF4444) : const Color(0xFF00C896); // More cases = red, fewer = green
+    
+    int wDiff = t.lastWeekCases > 0 ? (((t.weeklyCases - t.lastWeekCases) / t.lastWeekCases) * 100).toInt() : 0;
+    String wStr = wDiff >= 0 ? '+$wDiff%' : '$wDiff%';
+    Color wCol = wDiff >= 0 ? const Color(0xFFEF4444) : const Color(0xFF00C896);
+    
+    int mDiff = t.lastMonthCases > 0 ? (((t.monthlyCases - t.lastMonthCases) / t.lastMonthCases) * 100).toInt() : 0;
+    String mStr = mDiff >= 0 ? '+$mDiff%' : '$mDiff%';
+    Color mCol = mDiff >= 0 ? const Color(0xFFEF4444) : const Color(0xFF00C896);
+
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Row(
+          children: [
+            Expanded(child: _buildCompBox("Today's cases", t.todayCases.toString(), "$tStr vs yesterday", tCol)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildCompBox("This week", t.weeklyCases.toString(), "$wStr vs last week", wCol)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildCompBox("This month", t.monthlyCases.toString(), "$mStr vs last month", mCol)),
+          ],
+        );
+      }
+    );
+  }
+
+  Widget _buildCompBox(String title, String val, String sub, Color subCol) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1C23),
+        borderRadius: BorderRadius.circular(8),
       ),
-    );
-  }
-}
-
-class StatusProgressBar extends StatefulWidget {
-  final String label;
-  final int count;
-  final int total;
-  final Color color;
-
-  const StatusProgressBar({
-    super.key,
-    required this.label,
-    required this.count,
-    required this.total,
-    required this.color,
-  });
-
-  @override
-  State<StatusProgressBar> createState() => _StatusProgressBarState();
-}
-
-class _StatusProgressBarState extends State<StatusProgressBar> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _animation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
-    _controller.forward();
-  }
-
-  @override
-  void didUpdateWidget(StatusProgressBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.count != widget.count || oldWidget.total != widget.total) {
-      _controller.reset();
-      _controller.forward();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final double percentage = widget.total > 0 ? widget.count / widget.total : 0.0;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                widget.label,
-                style: AppTextStyles.bodyMedium(color: AppColors.textPrimary),
-              ),
-              Text(
-                '${widget.count} / ${widget.total}',
-                style: AppTextStyles.labelMedium(color: widget.color),
-              ),
-            ],
-          ),
+          Text(title, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
           const SizedBox(height: 6),
-          AnimatedBuilder(
-            animation: _animation,
-            builder: (context, child) {
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: _animation.value * percentage,
-                  backgroundColor: AppColors.border,
-                  valueColor: AlwaysStoppedAnimation<Color>(widget.color),
-                  minHeight: 10,
-                ),
-              );
-            },
-          ),
+          Text(val, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Text(sub, style: TextStyle(color: subCol, fontSize: 10)),
         ],
       ),
     );

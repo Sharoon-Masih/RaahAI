@@ -14,6 +14,7 @@ from typing import Any, Optional
 import firebase_admin
 from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import DocumentReference
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from backend.config import settings
 
@@ -30,11 +31,14 @@ def _resolve_service_account() -> Optional[str]:
     candidates = [
         settings.FIREBASE_SERVICE_ACCOUNT_PATH,
         Path(__file__).parent.parent.parent / "firebase_cred.json",
+        Path(__file__).parent.parent / "firebase_cred.json",
         Path(__file__).parent.parent.parent / "firebase-adminsdk.json",
         Path(__file__).parent.parent / "firebase-adminsdk.json",
         Path(__file__).parent.parent.parent / ".secrets" / "firebase-adminsdk.json",
     ]
     for p in candidates:
+        if not p:
+            continue
         path = Path(p)
         if path.exists():
             return str(path)
@@ -127,7 +131,7 @@ async def list_cases(limit: int = 100, status_filter: Optional[str] = None) -> l
     col = _col(settings.COLLECTION_CASES)
     query = col.order_by("pipeline_stage")
     if status_filter:
-        query = col.where("dispatch_status", "==", status_filter)
+        query = col.where(filter=FieldFilter("dispatch_status", "==", status_filter))
     docs = query.limit(limit).stream()
     return [d.to_dict() for d in docs]
 
@@ -177,7 +181,7 @@ async def get_available_volunteers() -> list[dict]:
     """Query all volunteers where is_available == True."""
     docs = (
         _col(settings.COLLECTION_VOLUNTEERS)
-        .where("is_available", "==", True)
+        .where(filter=FieldFilter("is_available", "==", True))
         .stream()
     )
     return [d.to_dict() for d in docs]
@@ -248,7 +252,7 @@ async def get_ngo_by_email(email: str) -> Optional[dict]:
     """Retrieve an NGO profile from Firestore by email (case-insensitive)."""
     docs = (
         _col(settings.COLLECTION_NGOS)
-        .where("email", "==", email.lower())
+        .where(filter=FieldFilter("email", "==", email.lower()))
         .limit(1)
         .stream()
     )

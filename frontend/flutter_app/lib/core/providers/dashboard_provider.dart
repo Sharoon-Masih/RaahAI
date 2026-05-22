@@ -30,8 +30,8 @@ class DashboardProvider extends ChangeNotifier {
     } catch (e) {
       _errorMessage = e.toString();
       
-      // Load mock dashboard data as a fallback to allow frontend-first evaluation
-      _loadMockSummary(e.toString());
+      // Do not load mock data, let the error show so we see real errors
+      // _loadMockSummary(e.toString());
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -66,8 +66,12 @@ class DashboardProvider extends ChangeNotifier {
       ),
       timeMetrics: TimeMetrics(
         todayCases: 5,
+        yesterdayCases: 4,
         weeklyCases: 28,
+        lastWeekCases: 25,
         monthlyCases: 120,
+        lastMonthCases: 110,
+        dailyIntake: [],
       ),
       emergencyTrends: {
         'food': 45,
@@ -76,6 +80,8 @@ class DashboardProvider extends ChangeNotifier {
         'emergency_cash': 20,
         'flood_relief': 8,
       },
+      recentCriticalCases: [],
+      volunteerAvailabilityList: [],
     );
   }
 }
