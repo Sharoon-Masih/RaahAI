@@ -91,16 +91,34 @@ async def login_ngo(req: NGOLoginRequest) -> NGOResponse:
     3. Returns the full NGO profile on success.
     """
     email_clean = req.email.strip().lower()
+    logger.info(f"[NGO Router] Login attempt for email: {email_clean}")
 
-    ngo_dict = await firebase_service.get_ngo_by_email(email_clean)
+    try:
+        ngo_dict = await firebase_service.get_ngo_by_email(email_clean)
+    except Exception as exc:
+        logger.error(f"[NGO Router] Firebase query error: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(exc)}",
+        )
+
     if not ngo_dict:
+        logger.warning(f"[NGO Router] No NGO found with email: {email_clean}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
         )
 
     hashed_pw = ngo_dict.get("password_hash")
-    if not hashed_pw or not firebase_service.verify_password(req.password, hashed_pw):
+    if not hashed_pw:
+        logger.error(f"[NGO Router] NGO {email_clean} has no password hash stored")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password.",
+        )
+
+    if not firebase_service.verify_password(req.password, hashed_pw):
+        logger.warning(f"[NGO Router] Password verification failed for {email_clean}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password.",
@@ -116,3 +134,28 @@ async def login_ngo(req: NGOLoginRequest) -> NGOResponse:
         locations=ngo_dict.get("locations", []),
         created_at=ngo_dict.get("created_at"),
     )
+
+
+@router.get("/debug/ngos-list", tags=["Debug"])
+async def list_ngos_debug():
+    """Debug endpoint: List all registered NGOs (development only)."""
+    try:
+        from backend.services.firebase_service import get_db
+        from backend.config import settings
+
+        db = get_db()
+        docs = db.collection(settings.COLLECTION_NGOS).stream()
+        ngos = []
+        for doc in docs:
+            data = doc.to_dict()
+            ngos.append({
+                "ngo_id": data.get("ngo_id"),
+                "name": data.get("name"),
+                "email": data.get("email"),
+            })
+        return {"count": len(ngos), "ngos": ngos}
+    except Exception as exc:
+        logger.error(f"[Debug] Failed to list NGOs: {exc}")
+        return {"error": str(exc)}
+
+

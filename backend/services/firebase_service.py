@@ -31,11 +31,14 @@ def _resolve_service_account() -> Optional[str]:
     candidates = [
         settings.FIREBASE_SERVICE_ACCOUNT_PATH,
         Path(__file__).parent.parent.parent / "firebase_cred.json",
+        Path(__file__).parent.parent / "firebase_cred.json",
         Path(__file__).parent.parent.parent / "firebase-adminsdk.json",
         Path(__file__).parent.parent / "firebase-adminsdk.json",
         Path(__file__).parent.parent.parent / ".secrets" / "firebase-adminsdk.json",
     ]
     for p in candidates:
+        if not p:
+            continue
         path = Path(p)
         if path.exists():
             return str(path)

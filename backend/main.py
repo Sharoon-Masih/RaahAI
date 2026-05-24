@@ -12,6 +12,8 @@
 #   Dispatch Agent     → GET  /api/v1/firebase/volunteers
 # ============================================================
 
+import shared.transport
+import shared.session
 import logging
 import sys
 from contextlib import asynccontextmanager
