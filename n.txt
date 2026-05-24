@@ -1,0 +1,15 @@
+cd E:\RaahAI
+.\.venv\Scripts\Activate.ps1
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+>> .\.venv\Scripts\Activate.ps1 --> For hifza only
+pip install -r requirements.txt
+python -m uvicorn backend.main:app --reload
+to deactivate virtal env=  deactivate
+
+cd frontend
+cd flutter_app
+flutter pub get
+flutter run -d chrome
+
+Email: admin@saylani.org
+Password: password123

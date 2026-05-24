@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Header, status
@@ -52,12 +52,21 @@ async def get_dashboard_summary(
     emergency_trends = {}
     
     now = datetime.now(timezone.utc)
+    today = now.date()
     today_cases = 0
+    yesterday_cases = 0
     weekly_cases = 0
+    last_week_cases = 0
     monthly_cases = 0
+    last_month_cases = 0
+    
+    # Daily intake for the last 14 days (index 13 = today, index 0 = 13 days ago)
+    daily_intake_map = { (today - timedelta(days=i)): 0 for i in range(14) }
     
     total_resolution_hours = 0.0
     resolved_count_for_avg = 0
+    
+    recent_critical_cases = []
 
     for case in cases:
         # Status aggregation
@@ -83,8 +92,7 @@ async def get_dashboard_summary(
             crisis = crisis.lower()
             emergency_trends[crisis] = emergency_trends.get(crisis, 0) + 1
             
-        # Time Metrics (assuming case_id is UUID, but timestamp might be in agent_trace)
-        # Or we use a created_at if available. We will check agent_trace for first timestamp.
+        # Time Metrics and Daily Intake
         traces = case.get("agent_trace", [])
         if traces:
             try:
@@ -92,13 +100,28 @@ async def get_dashboard_summary(
                 first_ts_str = traces[0].get("timestamp")
                 if first_ts_str:
                     first_ts = datetime.fromisoformat(first_ts_str.replace("Z", "+00:00"))
-                    delta = now - first_ts
-                    if delta.days == 0:
+                    case_date = first_ts.date()
+                    delta_days = (today - case_date).days
+                    
+                    # Exact time comparisons
+                    if delta_days == 0:
                         today_cases += 1
-                    if delta.days <= 7:
+                    elif delta_days == 1:
+                        yesterday_cases += 1
+                        
+                    if 0 <= delta_days <= 6:
                         weekly_cases += 1
-                    if delta.days <= 30:
+                    elif 7 <= delta_days <= 13:
+                        last_week_cases += 1
+                        
+                    if 0 <= delta_days <= 29:
                         monthly_cases += 1
+                    elif 30 <= delta_days <= 59:
+                        last_month_cases += 1
+                        
+                    # Daily intake array (14 days)
+                    if 0 <= delta_days < 14:
+                        daily_intake_map[case_date] += 1
                         
                 # If resolved (DISPATCHED), calculate resolution time
                 if d_status == "DISPATCHED":
@@ -111,6 +134,27 @@ async def get_dashboard_summary(
                             resolved_count_for_avg += 1
             except Exception:
                 pass
+                
+        # Capture critical cases for the recent list
+        if sev in ("high", "critical"):
+            # try to parse the timestamp for sorting
+            first_ts = datetime.min.replace(tzinfo=timezone.utc)
+            if traces:
+                ts_str = traces[0].get("timestamp")
+                if ts_str:
+                    try:
+                        first_ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    except:
+                        pass
+            
+            recent_critical_cases.append({
+                "applicant": case.get("applicant_name", "Unknown"),
+                "crisis": case.get("crisis_type", "Unknown").title(),
+                "score": case.get("severity_score", 0.0),
+                "status": d_status.title(),
+                "location": case.get("location_normalized", "Unknown"),
+                "_ts": first_ts
+            })
 
     avg_resolution = 0.0
     if resolved_count_for_avg > 0:
@@ -123,16 +167,32 @@ async def get_dashboard_summary(
         response_rate = round((responded / total_assigned) * 100, 2)
 
     # Fetch volunteers for metrics
+    volunteer_availability_list = []
     try:
         volunteers = await firebase_service.get_available_volunteers()
-        # Assume get_available_volunteers() returns only available ones for now, 
-        # but to be fully accurate we would fetch all and count. 
-        # For this design, we will just count the available ones.
         v_available = len(volunteers)
-        v_total = v_available + 38 # placeholder, as backend doesn't have a get_all_volunteers yet
+        v_total = v_available + 38 # placeholder
+        for v in volunteers[:5]:
+            volunteer_availability_list.append({
+                "name": v.get("name", "Unknown"),
+                "location": v.get("location", "Unknown"),
+                "is_available": v.get("is_available", True)
+            })
     except Exception:
         v_available = 0
         v_total = 0
+        
+    # Sort and take top 5 critical cases
+    recent_critical_cases.sort(key=lambda x: x["_ts"], reverse=True)
+    recent_critical_cases = recent_critical_cases[:5]
+    for c in recent_critical_cases:
+        c.pop("_ts")
+        
+    # Build daily intake array (ordered from oldest to newest)
+    daily_intake = []
+    for i in range(13, -1, -1):
+        d = today - timedelta(days=i)
+        daily_intake.append(daily_intake_map[d])
 
     return {
         "cases_overview": {
@@ -155,8 +215,14 @@ async def get_dashboard_summary(
         },
         "time_metrics": {
             "today_cases": today_cases,
+            "yesterday_cases": yesterday_cases,
             "weekly_cases": weekly_cases,
-            "monthly_cases": monthly_cases
+            "last_week_cases": last_week_cases,
+            "monthly_cases": monthly_cases,
+            "last_month_cases": last_month_cases,
+            "daily_intake": daily_intake
         },
+        "recent_critical_cases": recent_critical_cases,
+        "volunteer_availability_list": volunteer_availability_list,
         "emergency_trends": emergency_trends
     }

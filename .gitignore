@@ -1,1 +1,4 @@
 .env
+*.json
+backend/*firebase-adminsdk*.json
+backend/raahai-62cbf-firebase-adminsdk-fbsvc-5efb7a2f70.json
